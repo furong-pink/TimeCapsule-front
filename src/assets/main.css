@@ -1,0 +1,28 @@
+@import "./base.css";
+
+/* 让应用占满整个视口宽度与高度 */
+#app {
+  height: 100vh;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  font-weight: normal;
+}
+
+a,
+.green {
+  text-decoration: none;
+  color: hsla(160, 100%, 37%, 1);
+  transition: 0.4s;
+}
+
+@media (hover: hover) {
+  a:hover {
+    background-color: hsla(160, 100%, 37%, 0.2);
+  }
+}
+
+/* 移除官方模板里的布局：避免 body 居中、#app 只占一半导致右侧空白 */
+body {
+  display: block;
+}
