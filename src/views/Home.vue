@@ -491,7 +491,8 @@ export default {
   color: #8c939d;
   width: 80px;
   height: 80px;
-  line-height: 80px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>

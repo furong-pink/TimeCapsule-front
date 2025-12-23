@@ -1,5 +1,5 @@
 // src/router/index.js
-import { createRouter, createWebHashHistory } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'  // 修改：将createWebHashHistory改为createWebHistory
 
 // 导入视图组件
 import Login from '@/views/Login.vue'
@@ -51,7 +51,7 @@ const routes = [
 
 // 创建路由器实例
 const router = createRouter({
-  history: createWebHashHistory(), // 使用 hash 模式（简单、无需后端配置）
+  history: createWebHistory(), // 修改：将createWebHashHistory()改为createWebHistory()
   routes
 })
 
