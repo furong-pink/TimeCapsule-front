@@ -205,23 +205,51 @@ export default {
       await formRef.value.validate((valid) => {
         if (valid) {
           submitting.value = true
-          // 模拟保存
-          setTimeout(() => {
-            submitting.value = false
-            ElMessage.success('时间胶囊创建成功！')
-            // 保存到本地存储（实际应该调用API）
-            const capsules = JSON.parse(localStorage.getItem('capsules') || '[]')
-            capsules.push({
-              id: Date.now(),
-              ...form,
-              date: new Date().toISOString().split('T')[0],
-              openDate: form.openDate ? new Date(form.openDate).toISOString().split('T')[0] : ''
-            })
-            localStorage.setItem('capsules', JSON.stringify(capsules))
-            router.push('/')
-          }, 1000)
+          try {
+            // 使用API调用创建时间胶囊
+            if (window.$axios) {
+              const capsuleData = {
+                title: form.title,
+                content: form.content,
+                coverImage: form.cover,
+                openDate: form.openDate,
+                privacy: form.privacy,
+                enableReminder: form.enableReminder,
+                mediaFiles: form.mediaFiles
+              };
+              
+              window.$axios.post('/capsules', capsuleData).then(response => {
+                if (response?.code === 201) {
+                  ElMessage.success('时间胶囊创建成功！');
+                  router.push('/');
+                } else {
+                  ElMessage.error(response?.message || '创建失败');
+                }
+              }).catch(error => {
+                console.error('创建时间胶囊失败:', error);
+                ElMessage.error('创建失败: ' + (error.response?.data?.message || error.message));
+              });
+            } else {
+              // 如果没有API，回退到本地存储
+              const capsules = JSON.parse(localStorage.getItem('capsules') || '[]');
+              capsules.push({
+                id: Date.now(),
+                ...form,
+                date: new Date().toISOString().split('T')[0],
+                openDate: form.openDate ? new Date(form.openDate).toISOString().split('T')[0] : ''
+              });
+              localStorage.setItem('capsules', JSON.stringify(capsules));
+              ElMessage.success('时间胶囊创建成功！');
+              router.push('/');
+            }
+          } catch (error) {
+            console.error('创建时间胶囊失败:', error);
+            ElMessage.error('创建失败: ' + (error.response?.data?.message || error.message));
+          } finally {
+            submitting.value = false;
+          }
         } else {
-          ElMessage.warning('请填写完整信息')
+          ElMessage.warning('请填写完整信息');
         }
       })
     }

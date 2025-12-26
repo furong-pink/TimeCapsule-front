@@ -213,7 +213,7 @@
 </template>
 
 <script>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, CircleCheck, Clock, Trophy, MoreFilled, Calendar, Flag } from '@element-plus/icons-vue'
 
@@ -235,38 +235,174 @@ export default {
     const goalFormRef = ref(null)
     const currentProgressGoal = ref(null)
 
-    const goals = ref([
-      {
-        id: 1,
-        title: '学习新技术',
-        description: '掌握Vue 3和Element Plus的使用',
-        progress: 70,
-        status: '进行中',
-        type: 'short-term',
-        targetDate: '2025-06-30',
-        enableReminder: true
-      },
-      {
-        id: 2,
-        title: '健身计划',
-        description: '每周锻炼3次，持续3个月',
-        progress: 100,
-        status: '已完成',
-        type: 'short-term',
-        targetDate: '2025-03-31',
-        enableReminder: false
-      },
-      {
-        id: 3,
-        title: '阅读目标',
-        description: '今年读完12本书',
-        progress: 30,
-        status: '进行中',
-        type: 'long-term',
-        targetDate: '2025-12-31',
-        enableReminder: true
+    const goals = ref([])
+    
+    // 加载数据
+    const loadData = async () => {
+      try {
+        if (window.$axios) {
+          // 从API获取目标列表
+          window.$axios.get('/goals', { params: { page: 0, size: 100 } }).then(response => {
+            if (response?.data?.content) {
+              // 转换API响应数据格式
+              goals.value = response.data.content.map(goal => ({
+                id: goal.id,
+                title: goal.title,
+                description: goal.description,
+                progress: goal.progress,
+                status: goal.status === 'COMPLETED' ? '已完成' : goal.status === 'IN_PROGRESS' ? '进行中' : '已取消',
+                type: goal.type === 'LONG_TERM' ? 'long-term' : 'short-term',
+                targetDate: goal.targetDate,
+                enableReminder: goal.enableReminder
+              }));
+            } else {
+              // 如果API调用失败，使用模拟数据
+              goals.value = [
+                {
+                  id: 1,
+                  title: '学习新技术',
+                  description: '掌握Vue 3和Element Plus的使用',
+                  progress: 70,
+                  status: '进行中',
+                  type: 'short-term',
+                  targetDate: '2025-06-30',
+                  enableReminder: true
+                },
+                {
+                  id: 2,
+                  title: '健身计划',
+                  description: '每周锻炼3次，持续3个月',
+                  progress: 100,
+                  status: '已完成',
+                  type: 'short-term',
+                  targetDate: '2025-03-31',
+                  enableReminder: false
+                },
+                {
+                  id: 3,
+                  title: '阅读目标',
+                  description: '今年读完12本书',
+                  progress: 30,
+                  status: '进行中',
+                  type: 'long-term',
+                  targetDate: '2025-12-31',
+                  enableReminder: true
+                }
+              ];
+            }
+          }).catch(error => {
+            console.error('加载目标失败:', error);
+            // 如果API调用失败，使用模拟数据
+            goals.value = [
+              {
+                id: 1,
+                title: '学习新技术',
+                description: '掌握Vue 3和Element Plus的使用',
+                progress: 70,
+                status: '进行中',
+                type: 'short-term',
+                targetDate: '2025-06-30',
+                enableReminder: true
+              },
+              {
+                id: 2,
+                title: '健身计划',
+                description: '每周锻炼3次，持续3个月',
+                progress: 100,
+                status: '已完成',
+                type: 'short-term',
+                targetDate: '2025-03-31',
+                enableReminder: false
+              },
+              {
+                id: 3,
+                title: '阅读目标',
+                description: '今年读完12本书',
+                progress: 30,
+                status: '进行中',
+                type: 'long-term',
+                targetDate: '2025-12-31',
+                enableReminder: true
+              }
+            ];
+          });
+        } else {
+          // 如果没有API，使用模拟数据
+          goals.value = [
+            {
+              id: 1,
+              title: '学习新技术',
+              description: '掌握Vue 3和Element Plus的使用',
+              progress: 70,
+              status: '进行中',
+              type: 'short-term',
+              targetDate: '2025-06-30',
+              enableReminder: true
+            },
+            {
+              id: 2,
+              title: '健身计划',
+              description: '每周锻炼3次，持续3个月',
+              progress: 100,
+              status: '已完成',
+              type: 'short-term',
+              targetDate: '2025-03-31',
+              enableReminder: false
+            },
+            {
+              id: 3,
+              title: '阅读目标',
+              description: '今年读完12本书',
+              progress: 30,
+              status: '进行中',
+              type: 'long-term',
+              targetDate: '2025-12-31',
+              enableReminder: true
+            }
+          ];
+        }
+      } catch (error) {
+        console.error('加载目标失败:', error);
+        // 如果API调用失败，使用模拟数据
+        goals.value = [
+          {
+            id: 1,
+            title: '学习新技术',
+            description: '掌握Vue 3和Element Plus的使用',
+            progress: 70,
+            status: '进行中',
+            type: 'short-term',
+            targetDate: '2025-06-30',
+            enableReminder: true
+          },
+          {
+            id: 2,
+            title: '健身计划',
+            description: '每周锻炼3次，持续3个月',
+            progress: 100,
+            status: '已完成',
+            type: 'short-term',
+            targetDate: '2025-03-31',
+            enableReminder: false
+          },
+          {
+            id: 3,
+            title: '阅读目标',
+            description: '今年读完12本书',
+            progress: 30,
+            status: '进行中',
+            type: 'long-term',
+            targetDate: '2025-12-31',
+            enableReminder: true
+          }
+        ];
       }
-    ])
+    }
+    
+    // 组件挂载时加载数据
+    onMounted(() => {
+      loadData();
+    })
 
     const goalForm = reactive({
       title: '',
@@ -351,20 +487,89 @@ export default {
         if (valid) {
           if (editingGoal.value) {
             // 编辑
-            Object.assign(editingGoal.value, {
-              ...goalForm,
-              status: goalForm.progress >= 100 ? '已完成' : '进行中'
-            })
-            ElMessage.success('目标更新成功')
+            try {
+              if (window.$axios) {
+                // 使用API更新目标
+                const goalData = {
+                  title: goalForm.title,
+                  description: goalForm.description,
+                  type: goalForm.type === 'long-term' ? 'LONG_TERM' : 'SHORT_TERM',
+                  targetDate: goalForm.targetDate,
+                  progress: goalForm.progress,
+                  enableReminder: goalForm.enableReminder
+                };
+                
+                window.$axios.put(`/goals/${editingGoal.value.id}`, goalData).then(response => {
+                  if (response?.code === 200) {
+                    // 更新本地数据
+                    Object.assign(editingGoal.value, {
+                      ...goalForm,
+                      status: goalForm.progress >= 100 ? '已完成' : '进行中'
+                    });
+                    ElMessage.success('目标更新成功');
+                  } else {
+                    ElMessage.error(response?.message || '更新失败');
+                  }
+                }).catch(error => {
+                  console.error('更新目标失败:', error);
+                  ElMessage.error('更新失败: ' + (error.response?.data?.message || error.message));
+                });
+              } else {
+                // 如果没有API，更新本地数据
+                Object.assign(editingGoal.value, {
+                  ...goalForm,
+                  status: goalForm.progress >= 100 ? '已完成' : '进行中'
+                });
+                ElMessage.success('目标更新成功');
+              }
+            } catch (error) {
+              console.error('更新目标失败:', error);
+              ElMessage.error('更新失败: ' + (error.response?.data?.message || error.message));
+            }
             editingGoal.value = null
           } else {
             // 新增
-            goals.value.push({
-              id: Date.now(),
-              ...goalForm,
-              status: goalForm.progress >= 100 ? '已完成' : '进行中'
-            })
-            ElMessage.success('目标添加成功')
+            try {
+              if (window.$axios) {
+                // 使用API创建目标
+                const goalData = {
+                  title: goalForm.title,
+                  description: goalForm.description,
+                  type: goalForm.type === 'long-term' ? 'LONG_TERM' : 'SHORT_TERM',
+                  targetDate: goalForm.targetDate,
+                  progress: goalForm.progress,
+                  enableReminder: goalForm.enableReminder
+                };
+                
+                window.$axios.post('/goals', goalData).then(response => {
+                  if (response?.code === 201) {
+                    // 添加到本地数据
+                    goals.value.push({
+                      id: response.data.id || Date.now(),
+                      ...goalForm,
+                      status: goalForm.progress >= 100 ? '已完成' : '进行中'
+                    });
+                    ElMessage.success('目标添加成功');
+                  } else {
+                    ElMessage.error(response?.message || '添加失败');
+                  }
+                }).catch(error => {
+                  console.error('添加目标失败:', error);
+                  ElMessage.error('添加失败: ' + (error.response?.data?.message || error.message));
+                });
+              } else {
+                // 如果没有API，添加到本地数据
+                goals.value.push({
+                  id: Date.now(),
+                  ...goalForm,
+                  status: goalForm.progress >= 100 ? '已完成' : '进行中'
+                });
+                ElMessage.success('目标添加成功');
+              }
+            } catch (error) {
+              console.error('添加目标失败:', error);
+              ElMessage.error('添加失败: ' + (error.response?.data?.message || error.message));
+            }
           }
           showAddDialog.value = false
           resetForm()
@@ -390,19 +595,71 @@ export default {
       showProgressDialog.value = true
     }
 
-    const saveProgress = () => {
+    const saveProgress = async () => {
       if (currentProgressGoal.value) {
-        currentProgressGoal.value.progress = progressForm.progress
-        if (progressForm.progress >= 100) {
-          currentProgressGoal.value.status = '已完成'
+        try {
+          if (window.$axios) {
+            // 使用API更新目标进度
+            window.$axios.patch(`/goals/${currentProgressGoal.value.id}/progress`, {
+              progress: progressForm.progress
+            }).then(response => {
+              if (response?.code === 200) {
+                // 更新本地数据
+                currentProgressGoal.value.progress = progressForm.progress
+                if (progressForm.progress >= 100) {
+                  currentProgressGoal.value.status = '已完成'
+                }
+                ElMessage.success('进度更新成功')
+              } else {
+                ElMessage.error(response?.message || '更新失败')
+              }
+            }).catch(error => {
+              console.error('更新进度失败:', error);
+              ElMessage.error('更新失败: ' + (error.response?.data?.message || error.message));
+            });
+          } else {
+            // 如果没有API，更新本地数据
+            currentProgressGoal.value.progress = progressForm.progress
+            if (progressForm.progress >= 100) {
+              currentProgressGoal.value.status = '已完成'
+            }
+            ElMessage.success('进度更新成功')
+          }
+        } catch (error) {
+          console.error('更新进度失败:', error);
+          ElMessage.error('更新失败: ' + (error.response?.data?.message || error.message));
+        } finally {
+          showProgressDialog.value = false
         }
-        ElMessage.success('进度更新成功')
-        showProgressDialog.value = false
       }
     }
 
-    const updateReminder = (goal) => {
-      ElMessage.success(`提醒已${goal.enableReminder ? '开启' : '关闭'}`)
+    const updateReminder = async (goal) => {
+      try {
+        if (window.$axios) {
+          // 使用API更新提醒设置
+          window.$axios.patch(`/goals/${goal.id}/reminder`, {
+            enableReminder: !goal.enableReminder
+          }).then(response => {
+            if (response?.code === 200) {
+              goal.enableReminder = !goal.enableReminder;
+              ElMessage.success(`提醒已${goal.enableReminder ? '开启' : '关闭'}`);
+            } else {
+              ElMessage.error(response?.message || '更新失败');
+            }
+          }).catch(error => {
+            console.error('更新提醒设置失败:', error);
+            ElMessage.error('更新失败: ' + (error.response?.data?.message || error.message));
+          });
+        } else {
+          // 如果没有API，更新本地数据
+          goal.enableReminder = !goal.enableReminder;
+          ElMessage.success(`提醒已${goal.enableReminder ? '开启' : '关闭'}`);
+        }
+      } catch (error) {
+        console.error('更新提醒设置失败:', error);
+        ElMessage.error('更新失败: ' + (error.response?.data?.message || error.message));
+      }
     }
 
     return {

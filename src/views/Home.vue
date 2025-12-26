@@ -205,8 +205,19 @@ export default {
         this.loading = true
         // 使用真实API调用
         if (this.$axios) {
-          const response = await this.$axios.get('/api/capsules.json')
-          this.capsules = response.data || []
+          // 获取首页统计数据
+          const statsResponse = await this.$axios.get('/statistics/home');
+          if (statsResponse?.data?.recentCapsules) {
+            this.capsules = statsResponse.data.recentCapsules;
+          } else {
+            // 如果API调用失败，获取时间胶囊列表
+            const capsulesResponse = await this.$axios.get('/capsules');
+            if (capsulesResponse?.data?.content) {
+              this.capsules = capsulesResponse.data.content;
+            } else {
+              this.capsules = [];
+            }
+          }
         } else {
           // 如果没有axios，使用fetch
           const response = await fetch('/api/capsules.json')
@@ -239,13 +250,41 @@ export default {
       // 跳转到胶囊详情或时间轴
       this.$router.push(`/timeline`)
     },
-    saveProfile() {
-      this.userInfo.nickname = this.editForm.nickname
-      this.userInfo.bio = this.editForm.bio
-      // 保存到本地存储
-      localStorage.setItem('user', JSON.stringify(this.userInfo))
-      ElMessage.success('资料保存成功')
-      this.showEditDialog = false
+    async saveProfile() {
+      try {
+        if (this.$axios) {
+          // 使用API更新用户信息
+          const updateData = {
+            nickname: this.editForm.nickname,
+            bio: this.editForm.bio,
+            avatar: this.userInfo.avatar
+          };
+          
+          const response = await this.$axios.put('/users/profile', updateData);
+          
+          if (response?.code === 200) {
+            // 更新本地存储
+            this.userInfo.nickname = this.editForm.nickname
+            this.userInfo.bio = this.editForm.bio
+            localStorage.setItem('user', JSON.stringify(this.userInfo));
+            ElMessage.success('资料保存成功');
+          } else {
+            ElMessage.error(response?.message || '更新失败');
+          }
+        } else {
+          // 如果没有API，使用本地存储
+          this.userInfo.nickname = this.editForm.nickname
+          this.userInfo.bio = this.editForm.bio
+          // 保存到本地存储
+          localStorage.setItem('user', JSON.stringify(this.userInfo));
+          ElMessage.success('资料保存成功');
+        }
+      } catch (error) {
+        console.error('更新用户信息失败:', error);
+        ElMessage.error('更新失败: ' + (error.response?.data?.message || error.message));
+      } finally {
+        this.showEditDialog = false;
+      }
     },
     handleAvatarUpload(file) {
       // 处理头像上传

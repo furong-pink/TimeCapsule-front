@@ -205,9 +205,44 @@ export default {
       loading.value = true
       try {
         // 尝试从API加载
-        const response = await fetch('/api/capsules.json')
-        const data = await response.json()
-        activities.value = data || []
+        if (window.$axios) {
+          // 获取时间轴数据
+          window.$axios.get('/capsules/timeline').then(response => {
+            if (response?.data?.timeline) {
+              // 将时间轴数据转换为活动列表
+              const timelineActivities = [];
+              response.data.timeline.forEach(yearData => {
+                yearData.capsules.forEach(capsule => {
+                  timelineActivities.push({
+                    ...capsule,
+                    timestamp: capsule.createdAt || capsule.date,
+                    type: 'capsule'
+                  });
+                });
+              });
+              activities.value = timelineActivities;
+            } else {
+              activities.value = [];
+            }
+          }).catch(error => {
+            console.error('API加载失败:', error);
+            // 如果API调用失败，使用fetch作为后备
+            fetch('/api/capsules.json').then(response => response.json()).then(data => {
+              activities.value = data || [];
+            }).catch(fetchError => {
+              console.error('获取数据失败:', fetchError);
+              activities.value = [];
+            });
+          });
+        } else {
+          // 如果没有axios，使用fetch
+          fetch('/api/capsules.json').then(response => response.json()).then(data => {
+            activities.value = data || [];
+          }).catch(error => {
+            console.error('获取数据失败:', error);
+            activities.value = [];
+          });
+        }
       } catch (error) {
         console.error('加载失败:', error)
         // 使用模拟数据

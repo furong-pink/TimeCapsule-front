@@ -210,22 +210,60 @@ const handleLogin = async () => {
   await loginFormRef.value.validate((valid) => {
     if (valid) {
       loading.value = true
-      // 模拟登录请求
-      setTimeout(() => {
-        loading.value = false
-        // 尝试从注册信息中获取昵称
-        const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]')
-        const user = registeredUsers.find(u => u.account === loginForm.account)
-        
-        // 保存用户信息到本地存储
-        localStorage.setItem('user', JSON.stringify({
-          account: loginForm.account,
-          nickname: user?.nickname || loginForm.account, // 优先使用注册时的昵称
-          avatar: user?.avatar || ''
-        }))
-        ElMessage.success('登录成功')
-        router.push('/')
-      }, 1000)
+      try {
+        if (window.$axios) {
+          // 使用API登录
+          const loginData = {
+            account: loginForm.account,
+            password: loginForm.password,
+            remember: loginForm.remember
+          };
+          
+          window.$axios.post('/login', loginData).then(response => {
+            if (response?.code === 200 && response?.data) {
+              // 保存用户信息和token到本地存储
+              const userData = response.data.user;
+              const token = response.data.token;
+              
+              localStorage.setItem('user', JSON.stringify({
+                account: userData.account,
+                nickname: userData.nickname,
+                avatar: userData.avatar
+              }));
+              
+              // 保存token
+              localStorage.setItem('token', token);
+              
+              ElMessage.success('登录成功');
+              router.push('/');
+            } else {
+              ElMessage.error(response?.message || '登录失败');
+            }
+          }).catch(error => {
+            console.error('登录失败:', error);
+            ElMessage.error('登录失败: ' + (error.response?.data?.message || error.message));
+          });
+        } else {
+          // 如果没有API，使用本地存储
+          // 尝试从注册信息中获取昵称
+          const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
+          const user = registeredUsers.find(u => u.account === loginForm.account);
+          
+          // 保存用户信息到本地存储
+          localStorage.setItem('user', JSON.stringify({
+            account: loginForm.account,
+            nickname: user?.nickname || loginForm.account, // 优先使用注册时的昵称
+            avatar: user?.avatar || ''
+          }));
+          ElMessage.success('登录成功');
+          router.push('/');
+        }
+      } catch (error) {
+        console.error('登录失败:', error);
+        ElMessage.error('登录失败: ' + (error.response?.data?.message || error.message));
+      } finally {
+        loading.value = false;
+      }
     }
   })
 }
@@ -236,30 +274,68 @@ const handleRegister = async () => {
   await registerFormRef.value.validate((valid) => {
     if (valid) {
       loading.value = true
-      // 模拟注册请求
-      setTimeout(() => {
-        loading.value = false
-        // 保存注册用户信息
-        const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]')
-        registeredUsers.push({
-          account: registerForm.account,
-          password: registerForm.password, // 实际项目中不应该存储明文密码
-          nickname: registerForm.nickname,
-          avatar: '',
-          registerTime: new Date().toISOString()
-        })
-        localStorage.setItem('registeredUsers', JSON.stringify(registeredUsers))
-        
-        // 注册成功后自动登录
-        localStorage.setItem('user', JSON.stringify({
-          account: registerForm.account,
-          nickname: registerForm.nickname,
-          avatar: ''
-        }))
-        
-        ElMessage.success('注册成功')
-        router.push('/')
-      }, 1000)
+      try {
+        if (window.$axios) {
+          // 使用API注册
+          const registerData = {
+            account: registerForm.account,
+            password: registerForm.password,
+            nickname: registerForm.nickname
+          };
+          
+          window.$axios.post('/register', registerData).then(response => {
+            if (response?.code === 201 && response?.data) {
+              // 保存用户信息和token到本地存储
+              const userData = response.data.user;
+              const token = response.data.token;
+              
+              localStorage.setItem('user', JSON.stringify({
+                account: userData.account,
+                nickname: userData.nickname,
+                avatar: userData.avatar
+              }));
+              
+              // 保存token
+              localStorage.setItem('token', token);
+              
+              ElMessage.success('注册成功');
+              router.push('/');
+            } else {
+              ElMessage.error(response?.message || '注册失败');
+            }
+          }).catch(error => {
+            console.error('注册失败:', error);
+            ElMessage.error('注册失败: ' + (error.response?.data?.message || error.message));
+          });
+        } else {
+          // 如果没有API，使用本地存储
+          // 保存注册用户信息
+          const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
+          registeredUsers.push({
+            account: registerForm.account,
+            password: registerForm.password, // 实际项目中不应该存储明文密码
+            nickname: registerForm.nickname,
+            avatar: '',
+            registerTime: new Date().toISOString()
+          });
+          localStorage.setItem('registeredUsers', JSON.stringify(registeredUsers));
+          
+          // 注册成功后自动登录
+          localStorage.setItem('user', JSON.stringify({
+            account: registerForm.account,
+            nickname: registerForm.nickname,
+            avatar: ''
+          }));
+          
+          ElMessage.success('注册成功');
+          router.push('/');
+        }
+      } catch (error) {
+        console.error('注册失败:', error);
+        ElMessage.error('注册失败: ' + (error.response?.data?.message || error.message));
+      } finally {
+        loading.value = false;
+      }
     }
   })
 }
