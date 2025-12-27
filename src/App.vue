@@ -77,7 +77,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { House, Edit, Timer, Trophy, Medal, User, ArrowDown, SwitchButton } from '@element-plus/icons-vue'
@@ -91,6 +91,9 @@ const userInfo = ref({
   avatar: ''
 })
 
+// 登录状态（响应式）
+const loggedIn = ref(false)
+
 // 用户下拉菜单是否展开
 const userMenuOpen = ref(false)
 
@@ -101,8 +104,7 @@ const isLoginPage = computed(() => {
 
 // 检查登录状态
 const isLoggedIn = computed(() => {
-  const user = localStorage.getItem('user')
-  return !!user
+  return loggedIn.value
 })
 
 // 加载用户信息
@@ -111,9 +113,13 @@ const loadUserInfo = () => {
   if (user) {
     try {
       userInfo.value = JSON.parse(user)
+      loggedIn.value = true
     } catch (e) {
       console.error('加载用户信息失败', e)
+      loggedIn.value = false
     }
+  } else {
+    loggedIn.value = false
   }
 }
 
@@ -127,7 +133,9 @@ const handleCommand = (command) => {
     }).then(() => {
       // 清除用户信息
       localStorage.removeItem('user')
+      localStorage.removeItem('token')
       userInfo.value = { nickname: '', avatar: '' }
+      loggedIn.value = false
       ElMessage.success('已退出登录')
       // 跳转到登录页
       router.push('/login')
@@ -147,12 +155,33 @@ watch(() => route.path, (newPath) => {
   } else {
     // 如果已经在登录页，清除用户信息
     userInfo.value = { nickname: '', avatar: '' }
+    loggedIn.value = false
   }
 }, { immediate: true })
+
+// 监听localStorage变化（用于跨页面通信）
+const handleStorageChange = (e) => {
+  if (e.key === 'user') {
+    loadUserInfo()
+  }
+}
+
+// 自定义事件监听（用于同页面通信）
+const handleUserLogin = () => {
+  loadUserInfo()
+}
 
 // 组件挂载时加载用户信息
 onMounted(() => {
   loadUserInfo()
+  window.addEventListener('storage', handleStorageChange)
+  window.addEventListener('user-login', handleUserLogin)
+})
+
+// 组件卸载时移除事件监听
+onUnmounted(() => {
+  window.removeEventListener('storage', handleStorageChange)
+  window.removeEventListener('user-login', handleUserLogin)
 })
 </script>
 

@@ -234,6 +234,9 @@ const handleLogin = async () => {
               // 保存token
               localStorage.setItem('token', token);
               
+              // 触发自定义事件通知App.vue更新用户信息
+              window.dispatchEvent(new CustomEvent('user-login'));
+              
               ElMessage.success('登录成功');
               router.push('/');
             } else {
@@ -244,19 +247,7 @@ const handleLogin = async () => {
             ElMessage.error('登录失败: ' + (error.response?.data?.message || error.message));
           });
         } else {
-          // 如果没有API，使用本地存储
-          // 尝试从注册信息中获取昵称
-          const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
-          const user = registeredUsers.find(u => u.account === loginForm.account);
-          
-          // 保存用户信息到本地存储
-          localStorage.setItem('user', JSON.stringify({
-            account: loginForm.account,
-            nickname: user?.nickname || loginForm.account, // 优先使用注册时的昵称
-            avatar: user?.avatar || ''
-          }));
-          ElMessage.success('登录成功');
-          router.push('/');
+          ElMessage.error('API服务不可用');
         }
       } catch (error) {
         console.error('登录失败:', error);
@@ -284,22 +275,30 @@ const handleRegister = async () => {
           };
           
           window.$axios.post('/register', registerData).then(response => {
+            console.log('注册响应:', response);
             if (response?.code === 201 && response?.data) {
               // 保存用户信息和token到本地存储
-              const userData = response.data.user;
-              const token = response.data.token;
+              const userData = response.data;
+              const token = userData.token;
               
-              localStorage.setItem('user', JSON.stringify({
-                account: userData.account,
-                nickname: userData.nickname,
-                avatar: userData.avatar
-              }));
-              
-              // 保存token
-              localStorage.setItem('token', token);
-              
-              ElMessage.success('注册成功');
-              router.push('/');
+              if (userData && token) {
+                localStorage.setItem('user', JSON.stringify({
+                  account: userData.account || registerForm.account,
+                  nickname: userData.nickname || registerForm.nickname,
+                  avatar: userData.avatar || ''
+                }));
+                
+                // 保存token
+                localStorage.setItem('token', token);
+                
+                // 触发自定义事件通知App.vue更新用户信息
+                window.dispatchEvent(new CustomEvent('user-login'));
+                
+                ElMessage.success('注册成功');
+                router.push('/');
+              } else {
+                ElMessage.error('注册返回数据不完整');
+              }
             } else {
               ElMessage.error(response?.message || '注册失败');
             }
@@ -308,27 +307,7 @@ const handleRegister = async () => {
             ElMessage.error('注册失败: ' + (error.response?.data?.message || error.message));
           });
         } else {
-          // 如果没有API，使用本地存储
-          // 保存注册用户信息
-          const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
-          registeredUsers.push({
-            account: registerForm.account,
-            password: registerForm.password, // 实际项目中不应该存储明文密码
-            nickname: registerForm.nickname,
-            avatar: '',
-            registerTime: new Date().toISOString()
-          });
-          localStorage.setItem('registeredUsers', JSON.stringify(registeredUsers));
-          
-          // 注册成功后自动登录
-          localStorage.setItem('user', JSON.stringify({
-            account: registerForm.account,
-            nickname: registerForm.nickname,
-            avatar: ''
-          }));
-          
-          ElMessage.success('注册成功');
-          router.push('/');
+          ElMessage.error('API服务不可用');
         }
       } catch (error) {
         console.error('注册失败:', error);

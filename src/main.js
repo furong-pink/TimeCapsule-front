@@ -9,6 +9,7 @@ import './assets/main.css'
 
 const app = createApp(App)
 app.config.globalProperties.$axios = api // 将axios挂载到Vue实例上
+window.$axios = api // 同时挂载到window对象上，方便在组件中使用
 app.use(ElementPlus)
 app.use(router)
 app.mount('#app')
