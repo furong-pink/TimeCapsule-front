@@ -226,44 +226,17 @@ export default {
             }
           }).catch(error => {
             console.error('API加载失败:', error);
-            // 如果API调用失败，使用fetch作为后备
-            fetch('/api/capsules.json').then(response => response.json()).then(data => {
-              activities.value = data || [];
-            }).catch(fetchError => {
-              console.error('获取数据失败:', fetchError);
-              activities.value = [];
-            });
-          });
-        } else {
-          // 如果没有axios，使用fetch
-          fetch('/api/capsules.json').then(response => response.json()).then(data => {
-            activities.value = data || [];
-          }).catch(error => {
-            console.error('获取数据失败:', error);
+            // 不使用后备数据源，保持空数组
             activities.value = [];
           });
+        } else {
+          // 如果没有axios，直接返回空数组
+          activities.value = [];
         }
       } catch (error) {
         console.error('加载失败:', error)
-        // 使用模拟数据
-        activities.value = [
-          {
-            id: 1,
-            title: '创建第一个时间胶囊',
-            timestamp: '2025-04-05',
-            content: '致未来的自己的一封信',
-            privacy: 'private',
-            cover: ''
-          },
-          {
-            id: 2,
-            title: '制定年度计划',
-            timestamp: '2025-01-01',
-            content: '设定新年目标和期望',
-            privacy: 'public',
-            cover: ''
-          }
-        ]
+        // 不使用模拟数据，保持空数组
+        activities.value = []
       } finally {
         loading.value = false
       }

@@ -78,7 +78,7 @@
         shadow="hover"
         @click="viewCapsule(capsule)"
       >
-        <div class="capsule-cover" :style="{ backgroundImage: `url(${capsule.cover || '/default-cover.jpg'})` }">
+        <div class="capsule-cover" :style="{ backgroundImage: `url(${capsule.cover || '/default-cover.svg'})` }">
           <div class="capsule-overlay">
             <el-tag :type="capsule.privacy === 'public' ? 'success' : 'info'" size="small">
               {{ capsule.privacy === 'public' ? '公开' : '私密' }}
@@ -227,17 +227,8 @@ export default {
         this.loading = false
       } catch (error) {
         console.error('加载失败:', error)
-        // 模拟数据
-        this.capsules = [
-          {
-            id: 1,
-            title: '致未来的自己',
-            content: '希望未来的自己能够保持初心，继续前行...',
-            date: new Date().toISOString().split('T')[0],
-            privacy: 'private',
-            cover: ''
-          }
-        ]
+        // 不使用模拟数据，保持空数组
+        this.capsules = []
         this.loading = false
       }
     },
