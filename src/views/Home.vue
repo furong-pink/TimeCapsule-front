@@ -164,7 +164,14 @@ export default {
     todayGoalProgress() {
       // 计算今日目标完成进度（示例：如果有今日创建的胶囊则100%）
       const today = new Date().toISOString().split('T')[0]
-      const todayCapsules = this.capsules.filter(c => c.date === today)
+      const todayCapsules = this.capsules.filter(c => {
+        // 检查多种可能的日期字段
+        const capsuleDate = c.date || c.createdAt || c.created_at || c.openDate || c.open_date;
+        if (!capsuleDate) return false;
+        // 提取日期部分进行比较
+        const dateStr = new Date(capsuleDate).toISOString().split('T')[0];
+        return dateStr === today;
+      });
       return todayCapsules.length > 0 ? 100 : 0
     }
   },
@@ -172,9 +179,24 @@ export default {
     console.log('Home组件挂载');
     this.loadUserInfo()
     this.fetchData()
+    
+    // 监听localStorage变化，用于接收胶囊创建通知
+    window.addEventListener('storage', this.handleStorageChange);
   },
+  
+  beforeUnmount() {
+    // 移除事件监听
+    window.removeEventListener('storage', this.handleStorageChange);
+  },
+  
   methods: {
-
+    handleStorageChange(e) {
+      if (e.key === 'capsuleCreated' && e.newValue) {
+        // 当检测到胶囊创建事件时，重新获取数据
+        this.fetchData();
+      }
+    },
+    
     isPublic(privacy) {
       // 检查隐私设置是否为公开
       if (!privacy) return false;

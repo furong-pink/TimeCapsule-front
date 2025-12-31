@@ -221,6 +221,9 @@ export default {
               window.$axios.post('/capsules', capsuleData).then(response => {
                 if (response?.code === 201) {
                   ElMessage.success('时间胶囊创建成功！');
+                  // 设置一个标记，通知主页数据已更新
+                  localStorage.setItem('capsuleCreated', Date.now().toString());
+                  // 跳转到主页
                   router.push('/');
                 } else {
                   ElMessage.error(response?.message || '创建失败');
