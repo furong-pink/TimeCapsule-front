@@ -73,10 +73,10 @@
                 <div class="card-header">
                   <h4>{{ activity.title }}</h4>
                   <el-tag 
-                    :type="activity.privacy === 'public' ? 'success' : 'info'" 
+                    :type="(activity.privacy || '').toLowerCase() === 'public' ? 'success' : 'info'" 
                     size="small"
                   >
-                    {{ activity.privacy === 'public' ? '公开' : '私密' }}
+                    {{ (activity.privacy || '').toLowerCase() === 'public' ? '公开' : '私密' }}
                   </el-tag>
                 </div>
                 <p class="card-description">{{ activity.content || activity.description }}</p>
@@ -88,6 +88,11 @@
                   <span class="card-open-date" v-if="activity.openDate">
                     <el-icon><Clock /></el-icon>
                     开启于 {{ formatDate(activity.openDate) }}
+                  </span>
+                  <span class="card-status" v-if="activity.isOpened !== undefined">
+                    <el-tag :type="activity.isOpened ? 'success' : 'warning'" size="small">
+                      {{ activity.isOpened ? '已开启' : '未开启' }}
+                    </el-tag>
                   </span>
                 </div>
               </div>
@@ -101,6 +106,7 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { Plus, Calendar, Clock } from '@element-plus/icons-vue'
 
 export default {
@@ -111,6 +117,7 @@ export default {
     Clock
   },
   setup() {
+    const router = useRouter()
     const loading = ref(false)
     const selectedYear = ref('all')
     const activities = ref([])
@@ -162,19 +169,34 @@ export default {
     const formatTimestamp = (date) => {
       if (!date) return ''
       const d = new Date(date)
+      // 确保月份和日期格式正确
       return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
     }
 
     // 格式化日期
     const formatDate = (date) => {
       if (!date) return ''
-      const d = new Date(date)
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      // 处理可能的日期格式，避免时区问题
+      let d;
+      if (typeof date === 'string' && date.includes('T')) {
+        // 如果是ISO格式的日期字符串，创建时区正确的日期对象
+        d = new Date(date);
+      } else if (typeof date === 'string' && date.includes('-') && date.length === 10) {
+        // 如果是yyyy-MM-dd格式的日期字符串，直接解析
+        d = new Date(date + 'T00:00:00');
+      } else {
+        d = new Date(date);
+      }
+      // 确保日期不因时区转换而改变
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`
     }
 
     // 获取时间轴图标
     const getTimelineIcon = (activity) => {
-      if (activity.privacy === 'public') {
+      if ((activity.privacy || '').toLowerCase() === 'public') {
         return 'Share'
       }
       return 'Document'
@@ -182,7 +204,7 @@ export default {
 
     // 获取时间轴颜色
     const getTimelineColor = (activity) => {
-      if (activity.privacy === 'public') {
+      if ((activity.privacy || '').toLowerCase() === 'public') {
         return '#67c23a'
       }
       return '#409eff'
@@ -196,8 +218,18 @@ export default {
 
     // 查看胶囊详情
     const viewCapsule = (activity) => {
-      // 跳转到胶囊详情页或显示详情对话框
-      console.log('查看胶囊:', activity)
+      // 跳转到胶囊详情页
+      if (activity.id) {
+        // 检查胶囊是否已开启
+        if (activity.isOpened == true) {
+          router.push(`/capsule/${activity.id}`);
+        } else {
+          // 未开启，提示未开启
+          window.$message ? window.$message.info('此时间胶囊尚未开启') : alert('此时间胶囊尚未开启');
+        }
+      } else {
+        console.error('时间胶囊ID不存在:', activity);
+      }
     }
 
     // 加载数据
@@ -213,11 +245,15 @@ export default {
               const timelineActivities = [];
               response.data.timeline.forEach(yearData => {
                 yearData.capsules.forEach(capsule => {
-                  timelineActivities.push({
+                  // 确保使用创建时间作为时间戳
+                  const timestamp = capsule.createdAt || capsule.date;
+                  // 确保日期字段正确处理
+                  const processedCapsule = {
                     ...capsule,
-                    timestamp: capsule.createdAt || capsule.date,
+                    timestamp: timestamp,
                     type: 'capsule'
-                  });
+                  };
+                  timelineActivities.push(processedCapsule);
                 });
               });
               activities.value = timelineActivities;
@@ -403,6 +439,13 @@ p {
   font-size: 12px;
   color: #999;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.card-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .card-date,

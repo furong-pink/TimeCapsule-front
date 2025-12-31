@@ -6,7 +6,9 @@
       <div class="user-info">
         <div class="avatar-section">
           <el-avatar :size="80" :src="userInfo.avatar" shape="circle">
-            <el-icon><User /></el-icon>
+            <el-icon>
+              <User />
+            </el-icon>
           </el-avatar>
         </div>
         <div class="user-details">
@@ -28,7 +30,9 @@
           </div>
         </div>
         <el-button type="primary" plain @click="showEditDialog = true">
-          <el-icon><Edit /></el-icon>
+          <el-icon>
+            <Edit />
+          </el-icon>
           编辑资料
         </el-button>
       </div>
@@ -44,11 +48,8 @@
       </template>
       <div class="progress-content">
         <p class="goal-text">完成 1 封时间胶囊</p>
-        <el-progress 
-          :percentage="todayGoalProgress" 
-          :status="todayGoalProgress >= 100 ? 'success' : ''"
-          :stroke-width="12"
-        />
+        <el-progress :percentage="todayGoalProgress" :status="todayGoalProgress >= 100 ? 'success' : ''"
+          :stroke-width="12" />
         <p class="progress-text">{{ todayGoalProgress }}% 完成</p>
       </div>
     </el-card>
@@ -60,7 +61,9 @@
     </div>
 
     <div v-if="loading" class="loading">
-      <el-icon class="is-loading"><Loading /></el-icon>
+      <el-icon class="is-loading">
+        <Loading />
+      </el-icon>
       <span>正在加载...</span>
     </div>
 
@@ -71,17 +74,12 @@
     </div>
 
     <div v-else class="capsules-grid">
-      <el-card 
-        v-for="capsule in recentCapsules" 
-        :key="capsule.id"
-        class="capsule-card"
-        shadow="hover"
-        @click="viewCapsule(capsule)"
-      >
+      <el-card v-for="capsule in recentCapsules" :key="capsule.id" class="capsule-card" shadow="hover"
+        @click="viewCapsule(capsule)">
         <div class="capsule-cover" :style="{ backgroundImage: `url(${capsule.cover || '/default-cover.svg'})` }">
           <div class="capsule-overlay">
-            <el-tag :type="capsule.privacy === 'public' ? 'success' : 'info'" size="small">
-              {{ capsule.privacy === 'public' ? '公开' : '私密' }}
+            <el-tag :type="getTagType(capsule.privacy)" size="small">
+              {{ getTagText(capsule.privacy) }}
             </el-tag>
           </div>
         </div>
@@ -98,14 +96,11 @@
       <el-form :model="editForm" label-width="80px">
         <el-form-item label="头像">
           <div class="avatar-upload">
-            <el-upload
-              class="avatar-uploader"
-              action="#"
-              :show-file-list="false"
-              :before-upload="handleAvatarUpload"
-            >
+            <el-upload class="avatar-uploader" action="#" :show-file-list="false" :before-upload="handleAvatarUpload">
               <el-avatar v-if="userInfo.avatar" :src="userInfo.avatar" :size="80" shape="circle" />
-              <el-icon v-else class="avatar-uploader-icon"><Plus /></el-icon>
+              <el-icon v-else class="avatar-uploader-icon">
+                <Plus />
+              </el-icon>
             </el-upload>
             <p style="text-align: center; margin-top: 10px; color: #999;">点击头像上传新图片</p>
           </div>
@@ -114,14 +109,8 @@
           <el-input v-model="editForm.nickname" placeholder="请输入昵称" />
         </el-form-item>
         <el-form-item label="个人简介">
-          <el-input 
-            v-model="editForm.bio" 
-            type="textarea" 
-            :rows="4"
-            placeholder="介绍一下自己吧..."
-            maxlength="100"
-            show-word-limit
-          />
+          <el-input v-model="editForm.bio" type="textarea" :rows="4" placeholder="介绍一下自己吧..." maxlength="100"
+            show-word-limit />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -168,7 +157,7 @@ export default {
       // 返回最近6个胶囊
       return this.capsules.slice(0, 6).map(capsule => ({
         ...capsule,
-        cover: capsule.cover || '',
+        cover: capsule.coverImage || capsule.cover || '',
         preview: capsule.content?.substring(0, 50) || ''
       }))
     },
@@ -180,10 +169,27 @@ export default {
     }
   },
   mounted() {
+    console.log('Home组件挂载');
     this.loadUserInfo()
     this.fetchData()
   },
   methods: {
+
+    isPublic(privacy) {
+      // 检查隐私设置是否为公开
+      if (!privacy) return false;
+      return privacy.toUpperCase() === 'PUBLIC';
+    },
+    getTagType(privacy) {
+      console.log('getTagType被调用，privacy值:', privacy);
+      const isPublic = privacy && privacy.toString().toUpperCase() === 'PUBLIC';
+      return isPublic ? 'success' : 'info';
+    },
+    getTagText(privacy) {
+      console.log('getTagText被调用，privacy值:', privacy);
+      const isPublic = privacy && privacy.toString().toUpperCase() === 'PUBLIC';
+      return isPublic ? '公开' : '私密';
+    },
     loadUserInfo() {
       // 从本地存储加载用户信息
       const savedUser = localStorage.getItem('user')
@@ -209,11 +215,13 @@ export default {
           const statsResponse = await this.$axios.get('/statistics/home');
           if (statsResponse?.data?.recentCapsules) {
             this.capsules = statsResponse.data.recentCapsules;
+            console.log('使用statistics/home API数据:', statsResponse.data.recentCapsules);
           } else {
             // 如果API调用失败，获取时间胶囊列表
             const capsulesResponse = await this.$axios.get('/capsules');
             if (capsulesResponse?.data?.content) {
               this.capsules = capsulesResponse.data.content;
+              console.log('使用capsules API数据:', capsulesResponse.data.content);
             } else {
               this.capsules = [];
             }
@@ -224,12 +232,14 @@ export default {
           const data = await response.json()
           this.capsules = data || []
         }
+        console.log('API返回的胶囊数据:', this.capsules);
         this.loading = false
       } catch (error) {
         console.error('加载失败:', error)
         // 不使用模拟数据，保持空数组
         this.capsules = []
         this.loading = false
+        console.log('API加载失败，capsules设置为空数组')
       }
     },
     formatDate(date) {
@@ -250,9 +260,9 @@ export default {
             bio: this.editForm.bio,
             avatar: this.userInfo.avatar
           };
-          
+
           const response = await this.$axios.put('/users/profile', updateData);
-          
+
           if (response?.code === 200) {
             // 更新本地存储
             this.userInfo.nickname = this.editForm.nickname

@@ -8,6 +8,7 @@ import CapsuleCreate from '@/views/CapsuleCreate.vue'
 import Timeline from '@/views/Timeline.vue'
 import Goals from '@/views/Goals.vue'
 import Achievements from '@/views/Achievements.vue'
+import CapsuleDetail from '@/views/CapsuleDetail.vue'
 
 // 路由配置
 const routes = [
@@ -46,6 +47,13 @@ const routes = [
     name: 'Achievements',
     component: Achievements,
     meta: { title: '成就徽章' }
+  },
+  {
+    path: '/capsule/:id',
+    name: 'CapsuleDetail',
+    component: CapsuleDetail,
+    meta: { title: '时间胶囊详情' },
+    props: true
   }
 ]
 

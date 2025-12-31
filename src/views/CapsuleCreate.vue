@@ -212,7 +212,7 @@ export default {
                 title: form.title,
                 content: form.content,
                 coverImage: form.cover,
-                openDate: form.openDate,
+                openDate: form.openDate ? new Date(new Date(form.openDate).setHours(0, 0, 0, 0)).toISOString().split('T')[0] : null,
                 privacy: form.privacy,
                 enableReminder: form.enableReminder,
                 mediaFiles: form.mediaFiles
