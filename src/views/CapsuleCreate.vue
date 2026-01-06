@@ -164,12 +164,46 @@ export default {
     }
 
     // 处理封面图片上传
-    const handleCoverUpload = (file) => {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        form.cover = e.target.result
+    const handleCoverUpload = async (file) => {
+      // 检查文件类型
+      const isImage = file.type.startsWith('image/')
+      if (!isImage) {
+        ElMessage.error('请上传图片文件')
+        return false
       }
-      reader.readAsDataURL(file)
+      
+      // 检查文件大小 (10MB)
+      const isLt10M = file.size / 1024 / 1024 < 10
+      if (!isLt10M) {
+        ElMessage.error('图片大小不能超过10MB')
+        return false
+      }
+      
+      try {
+        // 上传到服务器
+        const formData = new FormData()
+        formData.append('file', file)
+        
+        const response = await window.$axios.post('/upload', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        })
+        
+        if (response?.code === 200) {
+          // 上传成功，更新封面URL
+          form.cover = response.data.fileUrl
+          ElMessage.success('封面上传成功')
+        } else {
+          ElMessage.error(response?.message || '封面上传失败')
+          return false
+        }
+      } catch (error) {
+        console.error('封面上传失败:', error)
+        ElMessage.error('封面上传失败: ' + (error.response?.data?.message || error.message))
+        return false
+      }
+      
       return false // 阻止自动上传
     }
 
@@ -178,16 +212,53 @@ export default {
     }
 
     // 处理媒体文件上传
-    const handleMediaUpload = (file) => {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        form.mediaFiles.push({
-          uid: Date.now(),
-          name: file.name,
-          url: e.target.result
-        })
+    const handleMediaUpload = async (file) => {
+      // 检查文件类型
+      const isImage = file.type.startsWith('image/')
+      const isVideo = file.type.startsWith('video/')
+      if (!isImage && !isVideo) {
+        ElMessage.error('请上传图片或视频文件')
+        return false
       }
-      reader.readAsDataURL(file)
+      
+      // 检查文件大小 (10MB)
+      const isLt10M = file.size / 1024 / 1024 < 10
+      if (!isLt10M) {
+        ElMessage.error('文件大小不能超过10MB')
+        return false
+      }
+      
+      try {
+        // 上传到服务器
+        const formData = new FormData()
+        formData.append('file', file)
+        
+        const response = await window.$axios.post('/upload', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        })
+        
+        if (response?.code === 200) {
+          // 上传成功，添加到媒体文件列表
+          form.mediaFiles.push({
+            uid: Date.now(),
+            name: file.name,
+            url: response.data.fileUrl,
+            type: file.type,
+            size: file.size
+          })
+          ElMessage.success('媒体文件上传成功')
+        } else {
+          ElMessage.error(response?.message || '媒体文件上传失败')
+          return false
+        }
+      } catch (error) {
+        console.error('媒体文件上传失败:', error)
+        ElMessage.error('媒体文件上传失败: ' + (error.response?.data?.message || error.message))
+        return false
+      }
+      
       return false
     }
 
@@ -213,9 +284,15 @@ export default {
                 content: form.content,
                 coverImage: form.cover,
                 openDate: form.openDate ? new Date(new Date(form.openDate).setHours(0, 0, 0, 0)).toISOString().split('T')[0] : null,
-                privacy: form.privacy,
+                privacy: form.privacy.toUpperCase(),
                 enableReminder: form.enableReminder,
-                mediaFiles: form.mediaFiles
+                mediaFiles: form.mediaFiles.map(file => ({
+                  fileUrl: file.url,
+                  fileName: file.name,
+                  fileType: file.type?.startsWith('image/') ? 'IMAGE' : 'VIDEO', // 根据文件类型确定
+                  mimeType: file.type,
+                  fileSize: file.size
+                }))
               };
               
               window.$axios.post('/capsules', capsuleData).then(response => {

@@ -309,16 +309,53 @@ export default {
         this.showEditDialog = false;
       }
     },
-    handleAvatarUpload(file) {
-      // 处理头像上传
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        this.userInfo.avatar = e.target.result
-        // 同步到编辑表单，方便后续扩展（如显示预览）
-        localStorage.setItem('user', JSON.stringify(this.userInfo))
-        ElMessage.success('头像更新成功')
+    async handleAvatarUpload(file) {
+      // 检查文件类型
+      const isImage = file.type.startsWith('image/')
+      if (!isImage) {
+        ElMessage.error('请上传图片文件')
+        return false
       }
-      reader.readAsDataURL(file)
+      
+      // 检查文件大小 (10MB)
+      const isLt10M = file.size / 1024 / 1024 < 10
+      if (!isLt10M) {
+        ElMessage.error('图片大小不能超过10MB')
+        return false
+      }
+      
+      try {
+        // 上传到服务器
+        const formData = new FormData()
+        formData.append('file', file)
+        
+        const response = await this.$axios.post('/upload', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        })
+        
+        if (response?.code === 200) {
+          // 上传成功，更新头像URL
+          this.userInfo.avatar = response.data.fileUrl
+          
+          // 更新本地存储
+          localStorage.setItem('user', JSON.stringify(this.userInfo))
+          
+          // 同时更新编辑表单
+          this.editForm.avatar = response.data.fileUrl
+          
+          ElMessage.success('头像上传成功')
+        } else {
+          ElMessage.error(response?.message || '头像上传失败')
+          return false
+        }
+      } catch (error) {
+        console.error('头像上传失败:', error)
+        ElMessage.error('头像上传失败: ' + (error.response?.data?.message || error.message))
+        return false
+      }
+      
       return false // 阻止自动上传
     }
   }
