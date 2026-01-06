@@ -108,18 +108,67 @@ const isLoggedIn = computed(() => {
 })
 
 // 加载用户信息
-const loadUserInfo = () => {
-  const user = localStorage.getItem('user')
-  if (user) {
+const loadUserInfo = async () => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    // 优先从服务器获取最新的用户信息
     try {
-      userInfo.value = JSON.parse(user)
-      loggedIn.value = true
+      const response = await window.$axios.get('/users/profile');
+      if (response?.code === 200 && response?.data) {
+        const userData = response.data;
+        userInfo.value = {
+          nickname: userData.nickname || '',
+          avatar: userData.avatar || '',
+          bio: userData.bio || ''
+        };
+        // 更新本地存储
+        localStorage.setItem('user', JSON.stringify({
+          nickname: userData.nickname,
+          avatar: userData.avatar,
+          bio: userData.bio
+        }));
+        loggedIn.value = true;
+      } else {
+        // 如果服务器获取失败，从本地存储加载
+        const user = localStorage.getItem('user');
+        if (user) {
+          const parsedUser = JSON.parse(user);
+          userInfo.value = parsedUser;
+          loggedIn.value = true;
+        } else {
+          loggedIn.value = false;
+        }
+      }
     } catch (e) {
-      console.error('加载用户信息失败', e)
-      loggedIn.value = false
+      // 如果服务器获取失败，从本地存储加载
+      const user = localStorage.getItem('user');
+      if (user) {
+        try {
+          const parsedUser = JSON.parse(user);
+          userInfo.value = parsedUser;
+          loggedIn.value = true;
+        } catch (parseError) {
+          console.error('加载用户信息失败', parseError);
+          loggedIn.value = false;
+        }
+      } else {
+        loggedIn.value = false;
+      }
     }
   } else {
-    loggedIn.value = false
+    // 没有token，直接从本地存储加载
+    const user = localStorage.getItem('user');
+    if (user) {
+      try {
+        userInfo.value = JSON.parse(user);
+        loggedIn.value = true;
+      } catch (e) {
+        console.error('加载用户信息失败', e);
+        loggedIn.value = false;
+      }
+    } else {
+      loggedIn.value = false;
+    }
   }
 }
 
@@ -160,20 +209,20 @@ watch(() => route.path, (newPath) => {
 }, { immediate: true })
 
 // 监听localStorage变化（用于跨页面通信）
-const handleStorageChange = (e) => {
+const handleStorageChange = async (e) => {
   if (e.key === 'user') {
-    loadUserInfo()
+    await loadUserInfo()
   }
 }
 
 // 自定义事件监听（用于同页面通信）
-const handleUserLogin = () => {
-  loadUserInfo()
+const handleUserLogin = async () => {
+  await loadUserInfo()
 }
 
 // 组件挂载时加载用户信息
-onMounted(() => {
-  loadUserInfo()
+onMounted(async () => {
+  await loadUserInfo()
   window.addEventListener('storage', handleStorageChange)
   window.addEventListener('user-login', handleUserLogin)
 })

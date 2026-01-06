@@ -61,18 +61,6 @@ export const authAPI = {
   sendCode: (data) => api.post('/send-code', data)
 };
 
-// 用户信息API
-export const userAPI = {
-  // 获取当前用户信息
-  getProfile: () => api.get('/users/profile'),
-  
-  // 更新用户信息
-  updateProfile: (data) => api.put('/users/profile', data),
-  
-  // 修改密码
-  updatePassword: (data) => api.put('/users/password', data)
-};
-
 // 时间胶囊API
 export const capsuleAPI = {
   // 获取时间胶囊列表
@@ -140,6 +128,18 @@ export const achievementAPI = {
   
   // 检查并解锁成就
   checkAchievements: () => api.post('/achievements/check')
+};
+
+// 用户API
+export const userAPI = {
+  // 获取当前用户信息
+  getCurrentUser: () => api.get('/users/profile'),
+  
+  // 更新用户信息
+  updateUserProfile: (data) => api.put('/users/profile', data),
+  
+  // 修改密码
+  updatePassword: (data) => api.put('/users/password', data)
 };
 
 // 统计API

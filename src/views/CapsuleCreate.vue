@@ -32,20 +32,6 @@
         <p class="form-tip">选择未来的某个日期，到时才能打开这个胶囊</p>
       </el-form-item>
       
-      <!-- 多媒体上传 -->
-      <el-form-item label="封面图片">
-        <el-upload
-          class="cover-uploader"
-          action="#"
-          :show-file-list="false"
-          :before-upload="handleCoverUpload"
-          :on-remove="removeCover"
-        >
-          <img v-if="form.cover" :src="form.cover" class="cover-image" />
-          <el-icon v-else class="cover-uploader-icon"><Plus /></el-icon>
-        </el-upload>
-        <p class="form-tip">上传一张封面图片，让胶囊更美观（可选）</p>
-      </el-form-item>
 
       <el-form-item label="视频/图片">
         <el-upload
@@ -138,7 +124,6 @@ export default {
       title: '',
       openDate: '',
       content: '',
-      cover: '',
       privacy: 'private',
       enableReminder: true,
       mediaFiles: []
@@ -163,53 +148,6 @@ export default {
       return time.getTime() < Date.now() - 8.64e7 // 不能选择今天之前的日期
     }
 
-    // 处理封面图片上传
-    const handleCoverUpload = async (file) => {
-      // 检查文件类型
-      const isImage = file.type.startsWith('image/')
-      if (!isImage) {
-        ElMessage.error('请上传图片文件')
-        return false
-      }
-      
-      // 检查文件大小 (10MB)
-      const isLt10M = file.size / 1024 / 1024 < 10
-      if (!isLt10M) {
-        ElMessage.error('图片大小不能超过10MB')
-        return false
-      }
-      
-      try {
-        // 上传到服务器
-        const formData = new FormData()
-        formData.append('file', file)
-        
-        const response = await window.$axios.post('/upload', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          }
-        })
-        
-        if (response?.code === 200) {
-          // 上传成功，更新封面URL
-          form.cover = response.data.fileUrl
-          ElMessage.success('封面上传成功')
-        } else {
-          ElMessage.error(response?.message || '封面上传失败')
-          return false
-        }
-      } catch (error) {
-        console.error('封面上传失败:', error)
-        ElMessage.error('封面上传失败: ' + (error.response?.data?.message || error.message))
-        return false
-      }
-      
-      return false // 阻止自动上传
-    }
-
-    const removeCover = () => {
-      form.cover = ''
-    }
 
     // 处理媒体文件上传
     const handleMediaUpload = async (file) => {
@@ -282,7 +220,6 @@ export default {
               const capsuleData = {
                 title: form.title,
                 content: form.content,
-                coverImage: form.cover,
                 openDate: form.openDate ? new Date(new Date(form.openDate).setHours(0, 0, 0, 0)).toISOString().split('T')[0] : null,
                 privacy: form.privacy.toUpperCase(),
                 enableReminder: form.enableReminder,
@@ -363,8 +300,6 @@ export default {
       rules,
       submitting,
       disabledDate,
-      handleCoverUpload,
-      removeCover,
       handleMediaUpload,
       handleMediaRemove,
       handleSubmit,
@@ -419,36 +354,6 @@ p {
   font-size: 12px;
   color: #999;
   line-height: 1.5;
-}
-
-/* 封面图片上传 */
-.cover-uploader {
-  width: 200px;
-}
-
-.cover-image {
-  width: 200px;
-  height: 200px;
-  object-fit: cover;
-  border-radius: 8px;
-  display: block;
-}
-
-.cover-uploader-icon {
-  font-size: 28px;
-  color: #8c939d;
-  width: 200px;
-  height: 200px;
-  line-height: 200px;
-  text-align: center;
-  border: 2px dashed #d9d9d9;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.cover-uploader-icon:hover {
-  border-color: #409EFF;
 }
 
 /* 媒体文件上传 */
