@@ -198,9 +198,9 @@ const handleDropdownVisibleChange = (visible) => {
 }
 
 // 监听路由变化
-watch(() => route.path, (newPath) => {
+watch(() => route.path, async (newPath) => {
   if (newPath !== '/login') {
-    loadUserInfo()
+    await loadUserInfo()
   } else {
     // 如果已经在登录页，清除用户信息
     userInfo.value = { nickname: '', avatar: '' }

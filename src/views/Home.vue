@@ -175,9 +175,9 @@ export default {
       return todayCapsules.length > 0 ? 100 : 0
     }
   },
-  mounted() {
+  async mounted() {
     console.log('Home组件挂载');
-    this.loadUserInfo()
+    await this.loadUserInfo()
     this.fetchData()
     
     // 监听localStorage变化，用于接收胶囊创建通知
@@ -212,19 +212,70 @@ export default {
       const isPublic = privacy && privacy.toString().toUpperCase() === 'PUBLIC';
       return isPublic ? '公开' : '私密';
     },
-    loadUserInfo() {
-      // 从本地存储加载用户信息
-      const savedUser = localStorage.getItem('user')
-      if (savedUser) {
+    async loadUserInfo() {
+      // 优先从服务器获取最新的用户信息
+      if (window.$axios) {
         try {
-          const user = JSON.parse(savedUser)
-          this.userInfo = { ...this.userInfo, ...user }
-          this.editForm = {
-            nickname: this.userInfo.nickname,
-            bio: this.userInfo.bio
+          const response = await window.$axios.get('/users/profile');
+          if (response?.code === 200 && response?.data) {
+            const userData = response.data;
+            this.userInfo = {
+              nickname: userData.nickname || '时光旅行者',
+              bio: userData.bio || '记录生活点滴，遇见更好的自己',
+              avatar: userData.avatar || ''
+            };
+            this.editForm = {
+              nickname: this.userInfo.nickname,
+              bio: this.userInfo.bio
+            };
+            // 更新本地存储
+            localStorage.setItem('user', JSON.stringify({
+              nickname: userData.nickname,
+              bio: userData.bio,
+              avatar: userData.avatar
+            }));
+          } else {
+            // 如果服务器获取失败，从本地存储加载
+            const savedUser = localStorage.getItem('user');
+            if (savedUser) {
+              const user = JSON.parse(savedUser);
+              this.userInfo = { ...this.userInfo, ...user };
+              this.editForm = {
+                nickname: this.userInfo.nickname,
+                bio: this.userInfo.bio
+              };
+            }
           }
         } catch (e) {
-          console.error('加载用户信息失败', e)
+          // 如果服务器获取失败，从本地存储加载
+          const savedUser = localStorage.getItem('user');
+          if (savedUser) {
+            try {
+              const user = JSON.parse(savedUser);
+              this.userInfo = { ...this.userInfo, ...user };
+              this.editForm = {
+                nickname: this.userInfo.nickname,
+                bio: this.userInfo.bio
+              };
+            } catch (parseError) {
+              console.error('加载用户信息失败', parseError);
+            }
+          }
+        }
+      } else {
+        // 如果没有axios，从本地存储加载
+        const savedUser = localStorage.getItem('user');
+        if (savedUser) {
+          try {
+            const user = JSON.parse(savedUser);
+            this.userInfo = { ...this.userInfo, ...user };
+            this.editForm = {
+              nickname: this.userInfo.nickname,
+              bio: this.userInfo.bio
+            };
+          } catch (e) {
+            console.error('加载用户信息失败', e);
+          }
         }
       }
     },
