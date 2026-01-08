@@ -30,25 +30,34 @@
       </template>
     </el-alert>
 
+    <!-- 加载状态 -->
+    <div v-if="loading" class="loading-container">
+      <el-spin size="large">
+        <template #default>
+          <div>正在加载成就数据...</div>
+        </template>
+      </el-spin>
+    </div>
+
     <!-- 成就筛选 -->
     <div class="achievement-filter">
       <el-button 
         :type="filterType === 'all' ? 'primary' : ''"
-        @click="filterType = 'all'"
+        @click="onFilterChange('all')"
         size="small"
       >
         全部
       </el-button>
       <el-button 
         :type="filterType === 'achieved' ? 'primary' : ''"
-        @click="filterType = 'achieved'"
+        @click="onFilterChange('achieved')"
         size="small"
       >
         已获得
       </el-button>
       <el-button 
         :type="filterType === 'locked' ? 'primary' : ''"
-        @click="filterType = 'locked'"
+        @click="onFilterChange('locked')"
         size="small"
       >
         未解锁
@@ -85,7 +94,7 @@
             {{ achievement.achieved ? '已获得' : '未解锁' }}
           </el-tag>
           <span class="unlock-condition" v-if="!achievement.achieved">
-            {{ achievement.condition }}
+            进度: {{ achievement.progress }}/{{ achievement.total }}
           </span>
           <span class="achieved-date" v-else>
             {{ formatDate(achievement.achievedDate) }}
@@ -108,11 +117,15 @@
           <el-divider />
           <div class="info-item">
             <span class="info-label">解锁条件：</span>
-            <span class="info-value">{{ selectedAchievement?.condition }}</span>
+            <span class="info-value">{{ selectedAchievement?.conditionType }}: {{ selectedAchievement?.conditionValue }}</span>
           </div>
           <div class="info-item" v-if="selectedAchievement?.achieved">
             <span class="info-label">获得时间：</span>
             <span class="info-value">{{ formatDate(selectedAchievement?.achievedDate) }}</span>
+          </div>
+          <div class="info-item" v-if="!selectedAchievement?.achieved">
+            <span class="info-label">当前进度：</span>
+            <span class="info-value">{{ selectedAchievement?.progress }}/{{ selectedAchievement?.total }} ({{ Math.round((selectedAchievement?.progress / selectedAchievement?.total) * 100) }}%)</span>
           </div>
         </div>
       </div>
@@ -121,7 +134,7 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { 
   Star, 
   Document, 
@@ -131,8 +144,10 @@ import {
   User,
   Calendar,
   Share,
-  CircleCheck
+  CircleCheck,
+  Loading
 } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 
 export default {
   name: 'Achievements',
@@ -145,142 +160,221 @@ export default {
     User,
     Calendar,
     Share,
-    CircleCheck
+    CircleCheck,
+    Loading
   },
   setup() {
     const filterType = ref('all')
     const showDetailDialog = ref(false)
     const selectedAchievement = ref(null)
-
-    const achievements = ref([
-      {
-        id: 1,
-        title: '初学者',
-        description: '创建第一个时间胶囊',
-        icon: 'Star',
-        achieved: true,
-        condition: '创建第一个时间胶囊',
-        achievedDate: '2025-01-15',
-        isNew: false
-      },
-      {
-        id: 2,
-        title: '记录者',
-        description: '创建5个时间胶囊',
-        icon: 'Document',
-        achieved: false,
-        condition: '创建5个时间胶囊',
-        progress: 2,
-        total: 5
-      },
-      {
-        id: 3,
-        title: '时间旅行者',
-        description: '打开一个过去的时间胶囊',
-        icon: 'Clock',
-        achieved: true,
-        condition: '打开一个过去的时间胶囊',
-        achievedDate: '2025-02-20',
-        isNew: true
-      },
-      {
-        id: 4,
-        title: '目标达人',
-        description: '完成3个个人目标',
-        icon: 'Trophy',
-        achieved: false,
-        condition: '完成3个个人目标',
-        progress: 1,
-        total: 3
-      },
-      {
-        id: 5,
-        title: '分享者',
-        description: '分享5个公开的时间胶囊',
-        icon: 'Share',
-        achieved: false,
-        condition: '分享5个公开的时间胶囊',
-        progress: 0,
-        total: 5
-      },
-      {
-        id: 6,
-        title: '坚持者',
-        description: '连续30天创建时间胶囊',
-        icon: 'Calendar',
-        achieved: false,
-        condition: '连续30天创建时间胶囊',
-        progress: 5,
-        total: 30
-      },
-      {
-        id: 7,
-        title: '成就收集家',
-        description: '获得10个成就徽章',
-        icon: 'Medal',
-        achieved: false,
-        condition: '获得10个成就徽章',
-        progress: 2,
-        total: 10
-      },
-      {
-        id: 8,
-        title: '完美主义者',
-        description: '完成所有目标',
-        icon: 'CircleCheck',
-        achieved: false,
-        condition: '完成所有设定的目标'
+    const loading = ref(false)
+    
+    // 存储从后端获取的成就数据
+    const achievements = ref([])
+    
+    // 统计信息
+    const statistics = ref({
+      total: 0,
+      achieved: 0,
+      locked: 0
+    })
+    
+    // 新解锁的成就
+    const newAchievements = ref([])
+    
+    // 根据API文档中的数据结构映射成就数据
+    const mapAchievementData = (achievement) => {
+      // 计算进度，如果已达成则设为100%
+      let calculatedProgress = achievement.progress || achievement.currentProgress || 0;
+      
+      if (achievement.achieved) {
+        // 如果成就已达成，进度应该等于条件值（即100%）
+        calculatedProgress = achievement.conditionValue || 100;
       }
-    ])
-
+      
+      return {
+        id: achievement.id,
+        title: achievement.title,
+        description: achievement.description,
+        icon: achievement.icon || 'Star', // 默认图标
+        achieved: achievement.achieved,
+        isNew: achievement.isNew,
+        achievedDate: achievement.achievedAt,
+        condition: `${achievement.conditionType}: ${achievement.conditionValue}`,
+        progress: calculatedProgress,
+        total: achievement.conditionValue,
+        conditionType: achievement.conditionType,
+        conditionValue: achievement.conditionValue
+      }
+    }
+    
+    // 加载成就数据
+    const loadAchievements = async (filter = 'ALL') => {
+      loading.value = true
+      try {
+        if (window.$axios) {
+          const response = await window.$axios.get(`/achievements?filter=${filter}`)
+          if (response?.code === 200 && response.data) {
+            // 映射成就列表数据
+            const newAchievementsData = response.data.list.map(mapAchievementData);
+            
+            // 强制更新数组以确保Vue响应式更新
+            achievements.value = [];
+            // 使用nextTick确保DOM更新后再设置新值
+            await new Promise(resolve => setTimeout(resolve, 0));
+            achievements.value = newAchievementsData;
+            
+            // 更新统计信息
+            if (response.data.statistics) {
+              statistics.value = response.data.statistics
+            }
+            
+            // 更新新解锁的成就
+            newAchievements.value = achievements.value.filter(a => a.isNew && a.achieved)
+            
+            console.log('获取成就数据成功:', response.data)
+          } else {
+            console.error('获取成就数据失败:', response)
+            ElMessage.error(response?.message || '获取成就数据失败')
+          }
+        } else {
+          console.error('window.$axios 未定义')
+          ElMessage.error('网络连接异常')
+        }
+      } catch (error) {
+        console.error('获取成就数据时发生错误:', error)
+        ElMessage.error('获取成就数据失败')
+      } finally {
+        loading.value = false
+      }
+    }
+    
+    // 检查并解锁成就
+    const checkAchievements = async () => {
+      try {
+        if (window.$axios) {
+          const response = await window.$axios.post('/achievements/check')
+          if (response?.code === 200 && response.data) {
+            if (response.data.newAchievements && response.data.newAchievements.length > 0) {
+              ElMessage.success(`恭喜！获得了 ${response.data.newAchievements.length} 个新成就`)
+              // 重新加载成就数据以更新显示状态
+              await loadAchievements(filterType.value.toUpperCase())
+            }
+          } else {
+            console.error('检查成就失败:', response)
+            ElMessage.error(response?.message || '检查成就失败')
+          }
+        }
+      } catch (error) {
+        console.error('检查成就时发生错误:', error)
+        ElMessage.error('检查成就失败')
+      }
+    }
+    
+    // 标记成就已读
+    const markAchievementAsRead = async (id) => {
+      try {
+        if (window.$axios) {
+          const response = await window.$axios.patch(`/achievements/${id}/read`)
+          if (response?.code === 200) {
+            console.log(`成就 ${id} 已标记为已读`)
+            // 更新本地数据
+            const achievement = achievements.value.find(a => a.id === id)
+            if (achievement) {
+              // 创建新对象以触发响应式更新
+              const index = achievements.value.indexOf(achievement);
+              if (index !== -1) {
+                achievement.isNew = false;
+                // 替换整个对象以确保响应式更新
+                achievements.value[index] = {...achievement};
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('标记成就已读失败:', error)
+      }
+    }
+    
+    // 计算属性
     const achievedCount = computed(() => {
-      return achievements.value.filter(a => a.achieved).length
+      return statistics.value.achieved
     })
 
     const totalCount = computed(() => {
-      return achievements.value.length
+      return statistics.value.total
     })
-
-    const newAchievements = computed(() => {
-      return achievements.value.filter(a => a.isNew && a.achieved)
-    })
-
+    
     const filteredAchievements = computed(() => {
+      // 创建一个新的数组以确保Vue响应式更新
+      const allAchievements = [...achievements.value];
+      
       if (filterType.value === 'all') {
-        return achievements.value
+        return allAchievements;
       } else if (filterType.value === 'achieved') {
-        return achievements.value.filter(a => a.achieved)
+        return allAchievements.filter(a => a.achieved);
       } else {
-        return achievements.value.filter(a => !a.achieved)
+        return allAchievements.filter(a => !a.achieved);
       }
     })
 
     const formatDate = (date) => {
       if (!date) return ''
-      const d = new Date(date)
-      return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
+      // 处理不同格式的日期字符串
+      if (typeof date === 'string') {
+        if (date.includes('T')) {
+          // ISO 8601 格式: 2025-01-15T10:30:00Z
+          const d = new Date(date)
+          return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
+        } else {
+          // 简单格式: 2025-01-15
+          const parts = date.split('-')
+          if (parts.length === 3) {
+            return `${parts[0]}年${parseInt(parts[1])}月${parseInt(parts[2])}日`
+          }
+        }
+      }
+      return ''
     }
 
     const showAchievementDetail = (achievement) => {
       selectedAchievement.value = achievement
       showDetailDialog.value = true
-      // 标记为已查看
+      // 标记为已查看（如果它是新的）
       if (achievement.isNew) {
-        achievement.isNew = false
+        markAchievementAsRead(achievement.id)
       }
     }
+    
+    // 监听筛选类型变化
+    const onFilterChange = (newFilter) => {
+      filterType.value = newFilter
+      loadAchievements(newFilter.toUpperCase())
+    }
+    
+    // 初始化数据
+    onMounted(async () => {
+      await loadAchievements('ALL')
+      // 检查是否有新成就
+      await checkAchievements()
+    })
 
     return {
       filterType,
       showDetailDialog,
       selectedAchievement,
+      loading,
       achievements,
+      statistics,
+      newAchievements: computed(() => achievements.value.filter(a => a.isNew && a.achieved)),
       achievedCount,
       totalCount,
-      newAchievements,
       filteredAchievements,
       formatDate,
-      showAchievementDetail
+      showAchievementDetail,
+      loadAchievements,
+      onFilterChange,
+      checkAchievements
     }
   }
 }
@@ -466,6 +560,14 @@ h3 {
 
 .achieved-date {
   color: #67c23a;
+}
+
+/* 加载状态 */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px 0;
 }
 
 /* 成就详情 */
