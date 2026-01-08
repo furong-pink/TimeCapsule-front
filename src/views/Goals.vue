@@ -243,14 +243,18 @@ export default {
         if (window.$axios) {
           // 从API获取目标列表
           window.$axios.get('/goals', { params: { page: 0, size: 100 } }).then(response => {
-            if (response?.data?.content) {
+            const resData = response?.data;
+            
+            const content = resData?.data?.content || resData?.content;
+            
+            if (content) {
               // 转换API响应数据格式
-              goals.value = response.data.content.map(goal => ({
+              goals.value = content.map(goal => ({
                 id: goal.id,
                 title: goal.title,
                 description: goal.description,
                 progress: goal.progress,
-                status: goal.status === 'COMPLETED' ? '已完成' : goal.status === 'IN_PROGRESS' ? '进行中' : '已取消',
+                status: goal.status === 'COMPLETED' || goal.status === 'completed' ? '已完成' : goal.status === 'IN_PROGRESS' || goal.status === 'in_progress' ? '进行中' : goal.status === 'CANCELLED' || goal.status === 'cancelled' ? '已取消' : '进行中',
                 type: goal.type === 'LONG_TERM' ? 'long-term' : 'short-term',
                 targetDate: goal.targetDate,
                 enableReminder: goal.enableReminder
@@ -500,15 +504,31 @@ export default {
                 };
                 
                 window.$axios.put(`/goals/${editingGoal.value.id}`, goalData).then(response => {
-                  if (response?.code === 200) {
+                  // 检查响应结构
+                  const resData = response?.data;
+                  
+                  // 检查成功状态
+                  const success = (resData?.code === 200 || resData?.code === 201) && resData?.data !== undefined;
+                  
+                  if (success) {
                     // 更新本地数据
-                    Object.assign(editingGoal.value, {
-                      ...goalForm,
-                      status: goalForm.progress >= 100 ? '已完成' : '进行中'
-                    });
+                    const updatedGoal = resData?.data;
+                    if (updatedGoal) {
+                      Object.assign(editingGoal.value, {
+                        title: updatedGoal.title,
+                        description: updatedGoal.description,
+                        progress: updatedGoal.progress,
+                        status: updatedGoal.status === 'COMPLETED' || updatedGoal.status === 'completed' ? '已完成' : updatedGoal.status === 'IN_PROGRESS' || updatedGoal.status === 'in_progress' ? '进行中' : updatedGoal.status === 'CANCELLED' || updatedGoal.status === 'cancelled' ? '已取消' : '进行中',
+                        type: updatedGoal.type === 'LONG_TERM' ? 'long-term' : 'short-term',
+                        targetDate: updatedGoal.targetDate,
+                        enableReminder: updatedGoal.enableReminder
+                      });
+                    }
                     ElMessage.success('目标更新成功');
+                    // 刷新目标列表以确保数据同步
+                    loadData();
                   } else {
-                    ElMessage.error(response?.message || '更新失败');
+                    ElMessage.error(resData?.message || resData?.msg || '更新失败');
                   }
                 }).catch(error => {
                   console.error('更新目标失败:', error);
@@ -542,16 +562,32 @@ export default {
                 };
                 
                 window.$axios.post('/goals', goalData).then(response => {
-                  if (response?.code === 201) {
+                  // 检查响应结构
+                  const resData = response?.data;
+                  
+                  // 检查成功状态
+                  const success = (resData?.code === 201 || resData?.code === 200) && resData?.data !== undefined;
+                  
+                  if (success) {
                     // 添加到本地数据
-                    goals.value.push({
-                      id: response.data.id || Date.now(),
-                      ...goalForm,
-                      status: goalForm.progress >= 100 ? '已完成' : '进行中'
-                    });
+                    const newGoal = resData?.data;
+                    if (newGoal) {
+                      goals.value.push({
+                        id: newGoal.id,
+                        title: newGoal.title,
+                        description: newGoal.description,
+                        progress: newGoal.progress,
+                        status: newGoal.status === 'COMPLETED' || newGoal.status === 'completed' ? '已完成' : newGoal.status === 'IN_PROGRESS' || newGoal.status === 'in_progress' ? '进行中' : newGoal.status === 'CANCELLED' || newGoal.status === 'cancelled' ? '已取消' : '进行中',
+                        type: newGoal.type === 'LONG_TERM' ? 'long-term' : 'short-term',
+                        targetDate: newGoal.targetDate,
+                        enableReminder: newGoal.enableReminder
+                      });
+                    }
                     ElMessage.success('目标添加成功');
+                    // 刷新目标列表以确保数据同步
+                    loadData();
                   } else {
-                    ElMessage.error(response?.message || '添加失败');
+                    ElMessage.error(resData?.message || resData?.msg || '添加失败');
                   }
                 }).catch(error => {
                   console.error('添加目标失败:', error);
@@ -603,15 +639,31 @@ export default {
             window.$axios.patch(`/goals/${currentProgressGoal.value.id}/progress`, {
               progress: progressForm.progress
             }).then(response => {
-              if (response?.code === 200) {
+              // 检查响应结构
+              const resData = response?.data;
+              
+              // 检查成功状态
+              const success = (resData?.code === 200 || resData?.code === 201) && resData?.data !== undefined;
+              
+              if (success) {
                 // 更新本地数据
-                currentProgressGoal.value.progress = progressForm.progress
-                if (progressForm.progress >= 100) {
-                  currentProgressGoal.value.status = '已完成'
+                const updatedGoal = resData?.data;
+                if (updatedGoal) {
+                  currentProgressGoal.value.progress = updatedGoal.progress;
+                  // 根据后端返回的状态值更新显示状态
+                  if (updatedGoal.status === 'COMPLETED' || updatedGoal.status === 'completed') {
+                    currentProgressGoal.value.status = '已完成';
+                  } else if (updatedGoal.status === 'IN_PROGRESS' || updatedGoal.status === 'in_progress') {
+                    currentProgressGoal.value.status = '进行中';
+                  } else if (updatedGoal.status === 'CANCELLED' || updatedGoal.status === 'cancelled') {
+                    currentProgressGoal.value.status = '已取消';
+                  }
                 }
-                ElMessage.success('进度更新成功')
+                ElMessage.success('进度更新成功');
+                // 刷新目标列表以确保数据同步
+                loadData();
               } else {
-                ElMessage.error(response?.message || '更新失败')
+                ElMessage.error(resData?.message || resData?.msg || '更新失败');
               }
             }).catch(error => {
               console.error('更新进度失败:', error);
@@ -641,11 +693,30 @@ export default {
           window.$axios.patch(`/goals/${goal.id}/reminder`, {
             enableReminder: !goal.enableReminder
           }).then(response => {
-            if (response?.code === 200) {
-              goal.enableReminder = !goal.enableReminder;
+            // 检查响应结构
+            const resData = response?.data;
+            
+            // 检查成功状态
+            const success = (resData?.code === 200 || resData?.code === 201) && resData?.data !== undefined;
+            
+            if (success) {
+              const updatedGoal = resData?.data;
+              if (updatedGoal) {
+                goal.enableReminder = updatedGoal.enableReminder;
+                // 同时更新状态，以防后端逻辑改变了状态
+                if (updatedGoal.status === 'COMPLETED' || updatedGoal.status === 'completed') {
+                  goal.status = '已完成';
+                } else if (updatedGoal.status === 'IN_PROGRESS' || updatedGoal.status === 'in_progress') {
+                  goal.status = '进行中';
+                } else if (updatedGoal.status === 'CANCELLED' || updatedGoal.status === 'cancelled') {
+                  goal.status = '已取消';
+                }
+              }
               ElMessage.success(`提醒已${goal.enableReminder ? '开启' : '关闭'}`);
+              // 刷新目标列表以确保数据同步
+              loadData();
             } else {
-              ElMessage.error(response?.message || '更新失败');
+              ElMessage.error(resData?.message || resData?.msg || '更新失败');
             }
           }).catch(error => {
             console.error('更新提醒设置失败:', error);

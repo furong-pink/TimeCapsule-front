@@ -61,22 +61,23 @@
             :key="index" 
             class="media-item"
           >
+            <!-- 提取媒体文件URL，兼容不同的字段名 -->
             <img 
-              v-if="isImage(media.url)" 
-              :src="media.url" 
-              :alt="media.name || '媒体文件'"
-              @click="previewImage(media.url)"
+              v-if="isImage(getMediaUrl(media))" 
+              :src="getMediaUrl(media)" 
+              :alt="getMediaFileName(media) || '媒体文件'"
+              @click="previewImage(getMediaUrl(media))"
               class="media-preview"
             />
             <video 
-              v-else-if="isVideo(media.url)" 
-              :src="media.url" 
+              v-else-if="isVideo(getMediaUrl(media))" 
+              :src="getMediaUrl(media)" 
               controls 
               class="media-preview"
             />
             <div v-else class="media-placeholder">
               <el-icon><Document /></el-icon>
-              <span>{{ media.name }}</span>
+              <span>{{ getMediaFileName(media) }}</span>
             </div>
           </div>
         </div>
@@ -145,18 +146,103 @@ export default {
 
     // 检查是否为图片
     const isImage = (url) => {
-      return /\.(jpg|jpeg|png|gif|webp)$/i.test(url)
+      console.log('检查是否为图片:', url); // 调试日志
+      if (!url) {
+        console.log('URL为空');
+        return false;
+      }
+      // 支持多种图片格式
+      const result = /\.(jpg|jpeg|png|gif|webp)$/i.test(url.toLowerCase());
+      console.log('图片检测结果:', result);
+      return result;
     }
 
     // 检查是否为视频
     const isVideo = (url) => {
-      return /\.(mp4|avi|mov|wmv|flv|mkv)$/i.test(url)
+      console.log('检查是否为视频:', url); // 调试日志
+      if (!url) {
+        console.log('URL为空');
+        return false;
+      }
+      // 支持多种视频格式
+      const result = /\.(mp4|avi|mov|wmv|flv|mkv)$/i.test(url.toLowerCase());
+      console.log('视频检测结果:', result);
+      return result;
+    }
+
+    // 获取媒体文件URL，兼容不同字段名
+    const getMediaUrl = (media) => {
+      // 尝试多种可能的字段名
+      return media.fileUrl || media.url || media.filePath || media.source || null;
+    }
+
+    // 获取媒体文件名，兼容不同字段名
+    const getMediaFileName = (media) => {
+      // 尝试多种可能的字段名
+      return media.fileName || media.name || media.title || '未知文件';
     }
 
     // 预览图片
     const previewImage = (url) => {
       // 这里可以实现图片预览功能
       console.log('预览图片:', url)
+    }
+    
+    // 重新加载胶囊详情（包含媒体文件）
+    const reloadCapsuleWithMedia = async (capsuleId) => {
+      try {
+        if (window.$axios) {
+          console.log('重新加载胶囊详情（含媒体文件），胶囊ID:', capsuleId);
+          // 重新获取胶囊详情，期望包含媒体文件
+          const response = await window.$axios.get(`/capsules/${capsuleId}`)
+          console.log('重新加载胶囊详情API响应:', response);
+          if (response?.code === 200 && response.data) {
+            // 用新的数据更新当前胶囊，保留媒体文件信息
+            Object.assign(capsule.value, response.data)
+            console.log('已更新胶囊数据（含媒体文件）:', capsule.value.mediaFiles);
+          }
+        }
+      } catch (error) {
+        console.error('重新加载胶囊详情失败:', error);
+      }
+    }
+    
+    // 单独加载媒体文件（备用方法）
+    const loadMediaFiles = async (capsuleId) => {
+      // 尝试重新加载整个胶囊详情
+      await reloadCapsuleWithMedia(capsuleId);
+      
+      // 如果仍然没有媒体文件，尝试从其他可能的API获取
+      if (!capsule.value.mediaFiles || capsule.value.mediaFiles.length === 0) {
+        try {
+          // 尝试获取所有胶囊（可能在列表API中包含媒体文件）
+          const listResponse = await window.$axios.get('/capsules?page=0&size=100')
+          if (listResponse?.code === 200 && listResponse.data?.data) {
+            const capsuleInList = listResponse.data.data.find(c => c.id === Number(capsuleId))
+            if (capsuleInList && capsuleInList.mediaFiles && capsuleInList.mediaFiles.length > 0) {
+              capsule.value.mediaFiles = capsuleInList.mediaFiles
+              console.log('从胶囊列表API获取到媒体文件:', capsule.value.mediaFiles);
+            }
+          }
+        } catch (listError) {
+          console.log('从胶囊列表API获取媒体文件失败:', listError.message);
+        }
+        
+        // 如果以上方法都失败，尝试检查响应中是否存在其他可能包含媒体文件的字段
+        if (!capsule.value.mediaFiles || capsule.value.mediaFiles.length === 0) {
+          // 检查是否在其他字段中存在媒体文件数据
+          if (capsule.value.media_files) {
+            capsule.value.mediaFiles = capsule.value.media_files;
+            console.log('从 media_files 字段获取到媒体文件');
+          } else if (capsule.value.files) {
+            capsule.value.mediaFiles = capsule.value.files;
+            console.log('从 files 字段获取到媒体文件');
+          } else if (capsule.value.attachments) {
+            capsule.value.mediaFiles = capsule.value.attachments;
+            console.log('从 attachments 字段获取到媒体文件');
+          }
+        }
+      }
     }
 
     // 加载胶囊详情
@@ -172,8 +258,18 @@ export default {
       try {
         if (window.$axios) {
           const response = await window.$axios.get(`/capsules/${id}`)
+          console.log('时间胶囊详情API响应:', response); // 调试日志
           if (response?.code === 200) {
             capsule.value = response.data
+            console.log('胶囊数据:', capsule.value); // 调试日志
+            
+            // 检查是否需要单独获取媒体文件
+            if (!capsule.value.mediaFiles || capsule.value.mediaFiles.length === 0) {
+              console.log('媒体文件为空，尝试单独加载');
+              await loadMediaFiles(id);
+            } else {
+              console.log('已从主API获取媒体文件:', capsule.value.mediaFiles.length, '个文件');
+            }
           } else {
             ElMessage.error(response?.message || '获取时间胶囊详情失败')
             router.push('/timeline')
@@ -185,7 +281,13 @@ export default {
         }
       } catch (error) {
         console.error('获取时间胶囊详情失败:', error)
-        ElMessage.error('获取时间胶囊详情失败')
+        // 检查是否是JSON解析错误
+        if (error?.response?.status === 500 && error?.response?.data?.message?.includes('nesting depth')) {
+          ElMessage.error('服务器返回数据格式错误，请联系管理员')
+          console.error('检测到JSON序列化循环引用错误，后端需要修复关联查询')
+        } else {
+          ElMessage.error('获取时间胶囊详情失败')
+        }
         router.push('/timeline')
       } finally {
         loading.value = false

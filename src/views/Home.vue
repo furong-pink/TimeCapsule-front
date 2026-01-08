@@ -396,6 +396,10 @@ export default {
           // 同时更新编辑表单
           this.editForm.avatar = response.data.fileUrl
           
+          // 触发全局用户信息更新
+          const event = new CustomEvent('user-login', { detail: this.userInfo });
+          window.dispatchEvent(event);
+          
           ElMessage.success('头像上传成功')
         } else {
           ElMessage.error(response?.message || '头像上传失败')
