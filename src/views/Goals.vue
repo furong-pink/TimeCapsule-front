@@ -240,6 +240,14 @@ export default {
     // 加载数据
     const loadData = async () => {
       try {
+        // 检查用户是否已登录
+        const token = localStorage.getItem('token');
+        if (!token) {
+          // 如果用户未登录，直接设置为空数组，不显示默认数据
+          goals.value = [];
+          return;
+        }
+        
         if (window.$axios) {
           // 从API获取目标列表
           window.$axios.get('/goals', { params: { page: 0, size: 100 } }).then(response => {
@@ -260,146 +268,22 @@ export default {
                 enableReminder: goal.enableReminder
               }));
             } else {
-              // 如果API调用失败，使用模拟数据
-              goals.value = [
-                {
-                  id: 1,
-                  title: '学习新技术',
-                  description: '掌握Vue 3和Element Plus的使用',
-                  progress: 70,
-                  status: '进行中',
-                  type: 'short-term',
-                  targetDate: '2025-06-30',
-                  enableReminder: true
-                },
-                {
-                  id: 2,
-                  title: '健身计划',
-                  description: '每周锻炼3次，持续3个月',
-                  progress: 100,
-                  status: '已完成',
-                  type: 'short-term',
-                  targetDate: '2025-03-31',
-                  enableReminder: false
-                },
-                {
-                  id: 3,
-                  title: '阅读目标',
-                  description: '今年读完12本书',
-                  progress: 30,
-                  status: '进行中',
-                  type: 'long-term',
-                  targetDate: '2025-12-31',
-                  enableReminder: true
-                }
-              ];
+              // 如果API调用失败但用户已登录，设置为空数组而不是模拟数据
+              goals.value = [];
             }
           }).catch(error => {
             console.error('加载目标失败:', error);
-            // 如果API调用失败，使用模拟数据
-            goals.value = [
-              {
-                id: 1,
-                title: '学习新技术',
-                description: '掌握Vue 3和Element Plus的使用',
-                progress: 70,
-                status: '进行中',
-                type: 'short-term',
-                targetDate: '2025-06-30',
-                enableReminder: true
-              },
-              {
-                id: 2,
-                title: '健身计划',
-                description: '每周锻炼3次，持续3个月',
-                progress: 100,
-                status: '已完成',
-                type: 'short-term',
-                targetDate: '2025-03-31',
-                enableReminder: false
-              },
-              {
-                id: 3,
-                title: '阅读目标',
-                description: '今年读完12本书',
-                progress: 30,
-                status: '进行中',
-                type: 'long-term',
-                targetDate: '2025-12-31',
-                enableReminder: true
-              }
-            ];
+            // 如果API调用失败但用户已登录，设置为空数组而不是模拟数据
+            goals.value = [];
           });
         } else {
-          // 如果没有API，使用模拟数据
-          goals.value = [
-            {
-              id: 1,
-              title: '学习新技术',
-              description: '掌握Vue 3和Element Plus的使用',
-              progress: 70,
-              status: '进行中',
-              type: 'short-term',
-              targetDate: '2025-06-30',
-              enableReminder: true
-            },
-            {
-              id: 2,
-              title: '健身计划',
-              description: '每周锻炼3次，持续3个月',
-              progress: 100,
-              status: '已完成',
-              type: 'short-term',
-              targetDate: '2025-03-31',
-              enableReminder: false
-            },
-            {
-              id: 3,
-              title: '阅读目标',
-              description: '今年读完12本书',
-              progress: 30,
-              status: '进行中',
-              type: 'long-term',
-              targetDate: '2025-12-31',
-              enableReminder: true
-            }
-          ];
+          // 如果没有API且用户已登录，设置为空数组而不是模拟数据
+          goals.value = [];
         }
       } catch (error) {
         console.error('加载目标失败:', error);
-        // 如果API调用失败，使用模拟数据
-        goals.value = [
-          {
-            id: 1,
-            title: '学习新技术',
-            description: '掌握Vue 3和Element Plus的使用',
-            progress: 70,
-            status: '进行中',
-            type: 'short-term',
-            targetDate: '2025-06-30',
-            enableReminder: true
-          },
-          {
-            id: 2,
-            title: '健身计划',
-            description: '每周锻炼3次，持续3个月',
-            progress: 100,
-            status: '已完成',
-            type: 'short-term',
-            targetDate: '2025-03-31',
-            enableReminder: false
-          },
-          {
-            id: 3,
-            title: '阅读目标',
-            description: '今年读完12本书',
-            progress: 30,
-            status: '进行中',
-            type: 'long-term',
-            targetDate: '2025-12-31',
-            enableReminder: true
-          }
-        ];
+        // 如果出现异常但用户已登录，设置为空数组而不是模拟数据
+        goals.value = [];
       }
     }
     

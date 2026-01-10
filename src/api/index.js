@@ -25,6 +25,9 @@ api.interceptors.request.use(
   }
 );
 
+// 导入Element Plus组件
+import { ElMessageBox, ElMessage } from 'element-plus';
+
 // 响应拦截器
 api.interceptors.response.use(
   response => {
@@ -34,10 +37,20 @@ api.interceptors.response.use(
   error => {
     // 处理错误响应
     if (error.response?.status === 401) {
-      // Token过期，跳转到登录页
+      // Token过期，显示提示并跳转到登录页
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      
+      // 显示确认对话框，只提供确定选项
+      ElMessageBox.alert('登录已过期，请重新登录', '提示', {
+        confirmButtonText: '确定',
+        callback: () => {
+          window.location.href = '/login';
+        }
+      }).catch(() => {
+        // 捕获取消操作，但仍跳转到登录页
+        window.location.href = '/login';
+      });
     }
     return Promise.reject(error);
   }

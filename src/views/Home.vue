@@ -148,8 +148,8 @@ export default {
         nickname: '',
         bio: ''
       },
-      completedGoals: 2,
-      achievements: 3
+      completedGoals: 0,
+      achievements: 0
     }
   },
   computed: {
@@ -283,20 +283,47 @@ export default {
       try {
         this.loading = true
         // 使用真实API调用
-        if (this.$axios) {
+        if (window.$axios) {
           // 获取首页统计数据
-          const statsResponse = await this.$axios.get('/statistics/home');
-          if (statsResponse?.data?.recentCapsules) {
-            this.capsules = statsResponse.data.recentCapsules;
-            console.log('使用statistics/home API数据:', statsResponse.data.recentCapsules);
+          const statsResponse = await window.$axios.get('/statistics/home');
+          if (statsResponse?.data) {
+            // 更新统计数据
+            if (statsResponse.data.recentCapsules) {
+              this.capsules = statsResponse.data.recentCapsules;
+            } else {
+              // 如果API调用失败，获取时间胶囊列表
+              const capsulesResponse = await window.$axios.get('/capsules');
+              if (capsulesResponse?.data?.content) {
+                this.capsules = capsulesResponse.data.content;
+              } else {
+                this.capsules = [];
+              }
+            }
+            
+            // 更新统计数值，但保留实际胶囊列表
+            this.completedGoals = statsResponse.data.completedGoals || 0;
+            this.achievements = statsResponse.data.achievements || 0;
+            
+            console.log('使用statistics/home API数据:', statsResponse.data);
           } else {
-            // 如果API调用失败，获取时间胶囊列表
-            const capsulesResponse = await this.$axios.get('/capsules');
+            // 如果统计API调用失败，获取时间胶囊列表
+            const capsulesResponse = await window.$axios.get('/capsules');
             if (capsulesResponse?.data?.content) {
               this.capsules = capsulesResponse.data.content;
               console.log('使用capsules API数据:', capsulesResponse.data.content);
             } else {
               this.capsules = [];
+            }
+            
+            // 单独获取统计信息
+            try {
+              const statsResponse = await window.$axios.get('/statistics');
+              if (statsResponse?.data) {
+                this.completedGoals = statsResponse.data.completedGoals || 0;
+                this.achievements = statsResponse.data.achievements || 0;
+              }
+            } catch (statsError) {
+              console.error('获取统计数据失败:', statsError);
             }
           }
         } else {
