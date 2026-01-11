@@ -226,7 +226,7 @@ export default {
                 mediaFiles: form.mediaFiles.map(file => ({
                   fileUrl: file.url,
                   fileName: file.name,
-                  fileType: file.type?.startsWith('image/') ? 'IMAGE' : 'VIDEO', // 根据文件类型确定
+                  fileType: file.type?.startsWith('image/') ? 'IMAGE' : file.type?.startsWith('video/') ? 'VIDEO' : 'OTHER', // 根据文件类型确定
                   mimeType: file.type,
                   fileSize: file.size
                 }))

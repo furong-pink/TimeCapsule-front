@@ -63,21 +63,21 @@
           >
             <!-- 提取媒体文件URL，兼容不同的字段名 -->
             <img 
-              v-if="isImage(getMediaUrl(media))" 
-              :src="getMediaUrl(media)" 
-              :alt="getMediaFileName(media) || '媒体文件'"
-              @click="previewImage(getMediaUrl(media))"
+              v-if="media && isImage(getSafeMediaUrl(media))" 
+              :src="getSafeMediaUrl(media)" 
+              :alt="getSafeMediaFileName(media) || '媒体文件'"
+              @click="previewImage(getSafeMediaUrl(media))"
               class="media-preview"
             />
             <video 
-              v-else-if="isVideo(getMediaUrl(media))" 
-              :src="getMediaUrl(media)" 
+              v-else-if="media && isVideo(getSafeMediaUrl(media))" 
+              :src="getSafeMediaUrl(media)" 
               controls 
               class="media-preview"
             />
             <div v-else class="media-placeholder">
               <el-icon><Document /></el-icon>
-              <span>{{ getMediaFileName(media) }}</span>
+              <span>{{ getSafeMediaFileName(media) }}</span>
             </div>
           </div>
         </div>
@@ -116,6 +116,22 @@ export default {
     const capsule = ref({})
     const loading = ref(false)
     const opening = ref(false)
+    
+    // 安全获取媒体文件URL的辅助函数
+    const getSafeMediaUrl = (media) => {
+      if (!media || typeof media !== 'object') {
+        return null;
+      }
+      return media.fileUrl || media.url || media.filePath || media.source || null;
+    };
+    
+    // 安全获取媒体文件名的辅助函数
+    const getSafeMediaFileName = (media) => {
+      if (!media || typeof media !== 'object') {
+        return '未知文件';
+      }
+      return media.fileName || media.name || media.title || '未知文件';
+    };
 
     // 格式化日期
     const formatDate = (date) => {
@@ -147,8 +163,8 @@ export default {
     // 检查是否为图片
     const isImage = (url) => {
       console.log('检查是否为图片:', url); // 调试日志
-      if (!url) {
-        console.log('URL为空');
+      if (!url || typeof url !== 'string') {
+        console.log('URL为空或不是字符串');
         return false;
       }
       // 支持多种图片格式
@@ -160,8 +176,8 @@ export default {
     // 检查是否为视频
     const isVideo = (url) => {
       console.log('检查是否为视频:', url); // 调试日志
-      if (!url) {
-        console.log('URL为空');
+      if (!url || typeof url !== 'string') {
+        console.log('URL为空或不是字符串');
         return false;
       }
       // 支持多种视频格式
@@ -170,17 +186,7 @@ export default {
       return result;
     }
 
-    // 获取媒体文件URL，兼容不同字段名
-    const getMediaUrl = (media) => {
-      // 尝试多种可能的字段名
-      return media.fileUrl || media.url || media.filePath || media.source || null;
-    }
 
-    // 获取媒体文件名，兼容不同字段名
-    const getMediaFileName = (media) => {
-      // 尝试多种可能的字段名
-      return media.fileName || media.name || media.title || '未知文件';
-    }
 
     // 预览图片
     const previewImage = (url) => {
@@ -264,10 +270,13 @@ export default {
             console.log('胶囊数据:', capsule.value); // 调试日志
             
             // 检查是否需要单独获取媒体文件
-            if (!capsule.value.mediaFiles || capsule.value.mediaFiles.length === 0) {
-              console.log('媒体文件为空，尝试单独加载');
+            if (!capsule.value.mediaFiles || !Array.isArray(capsule.value.mediaFiles) || capsule.value.mediaFiles.length === 0) {
+              console.log('媒体文件为空或不是数组，尝试单独加载');
               await loadMediaFiles(id);
             } else {
+              // 确保媒体文件数组中的每个元素都是有效的对象
+              const validMediaFiles = capsule.value.mediaFiles.filter(media => media && typeof media === 'object');
+              capsule.value.mediaFiles = validMediaFiles;
               console.log('已从主API获取媒体文件:', capsule.value.mediaFiles.length, '个文件');
             }
           } else {
@@ -344,7 +353,9 @@ export default {
       isImage,
       isVideo,
       previewImage,
-      openCapsule
+      openCapsule,
+      getSafeMediaUrl,
+      getSafeMediaFileName
     }
   }
 }
