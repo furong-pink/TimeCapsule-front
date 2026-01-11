@@ -249,27 +249,77 @@ export default {
         }
         
         if (window.$axios) {
+          // 准备认证头信息
+          const headers = {};
+          if (token) {  // 使用外层作用域的token变量
+            headers['Authorization'] = `Bearer ${token}`;
+          }
+          
           // 从API获取目标列表
-          window.$axios.get('/goals', { params: { page: 0, size: 100 } }).then(response => {
+          window.$axios.get('/goals', { 
+            params: { page: 0, size: 100 },
+            headers: headers
+          }).then(response => {
             const resData = response?.data;
             
-            const content = resData?.data?.content || resData?.content;
+            // 调试：打印响应结构
+            console.log('Goals API Response:', resData);
             
-            if (content) {
+            // 尝试多种可能的响应结构
+            let goalsData = null;
+            
+            // 检查标准分页结构 { data: { data: [...] } }
+            if (resData?.data?.data && Array.isArray(resData?.data?.data)) {
+              goalsData = resData.data.data;
+            } 
+            // 检查简化结构 { data: [...] }
+            else if (resData?.data && Array.isArray(resData?.data)) {
+              goalsData = resData.data;
+            }
+            // 检查包含content的结构 { data: { content: [...] } }
+            else if (resData?.data?.content && Array.isArray(resData?.data?.content)) {
+              goalsData = resData.data.content;
+            }
+            // 检查直接包含content的结构 { content: [...] } （当前API返回的结构）
+            else if (resData?.content && Array.isArray(resData?.content)) {
+              goalsData = resData.content;
+            }
+            else if (Array.isArray(resData)) {
+              goalsData = resData;
+            }
+            
+            console.log('Parsed goalsData:', goalsData);
+            
+            if (Array.isArray(goalsData)) {
               // 转换API响应数据格式
-              goals.value = content.map(goal => ({
-                id: goal.id,
-                title: goal.title,
-                description: goal.description,
-                progress: goal.progress,
-                status: goal.status === 'COMPLETED' || goal.status === 'completed' ? '已完成' : goal.status === 'IN_PROGRESS' || goal.status === 'in_progress' ? '进行中' : goal.status === 'CANCELLED' || goal.status === 'cancelled' ? '已取消' : '进行中',
-                type: goal.type === 'LONG_TERM' ? 'long-term' : 'short-term',
-                targetDate: goal.targetDate,
-                enableReminder: goal.enableReminder
-              }));
+              goals.value = goalsData.map(goal => {
+                // 确定状态：优先使用后端返回的状态，但如果进度达到100%且状态仍为进行中，则应为已完成
+                let status = goal.status === 'COMPLETED' || goal.status === 'completed' ? '已完成' : 
+                         goal.status === 'IN_PROGRESS' || goal.status === 'in_progress' ? '进行中' : 
+                         goal.status === 'CANCELLED' || goal.status === 'cancelled' ? '已取消' : '进行中';
+                
+                // 补充逻辑：如果进度达到100%，但状态还不是已完成，则更新为已完成
+                if (goal.progress >= 100 && status === '进行中') {
+                  status = '已完成';
+                }
+                
+                return {
+                  id: goal.id,
+                  title: goal.title,
+                  description: goal.description,
+                  progress: goal.progress,
+                  status: status,
+                  type: goal.type === 'LONG_TERM' ? 'long-term' : 'short-term',
+                  targetDate: goal.targetDate,
+                  enableReminder: goal.enableReminder
+                };
+              });
+              
+              console.log('Mapped goals:', goals.value);
             } else {
               // 如果API调用失败但用户已登录，设置为空数组而不是模拟数据
               goals.value = [];
+              console.error('Failed to parse goals data from API response:', resData);
             }
           }).catch(error => {
             console.error('加载目标失败:', error);
@@ -359,13 +409,52 @@ export default {
           confirmButtonText: '确定',
           cancelButtonText: '取消',
           type: 'warning'
-        }).then(() => {
-          const index = goals.value.findIndex(g => g.id === goal.id)
-          if (index > -1) {
-            goals.value.splice(index, 1)
-            ElMessage.success('删除成功')
+        }).then(async () => {
+          try {
+            if (window.$axios) {
+              // 准备认证头信息
+              const token = localStorage.getItem('token');
+              const headers = {};
+              if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+              }
+              
+              // 调用后端API删除目标
+              const response = await window.$axios.delete(`/goals/${goal.id}`, {
+                headers: headers
+              });
+              
+              // 根据与更新进度相同的问题，response本身是API响应体
+              // response = {code: 200, message: '...', data: {...}, timestamp: '...'}
+              
+              // 检查响应
+              if (response?.code === 200) {
+                // 从本地数组中删除目标
+                const index = goals.value.findIndex(g => g.id === goal.id);
+                if (index > -1) {
+                  goals.value.splice(index, 1);
+                }
+                ElMessage.success('删除成功');
+              } else {
+                // 删除失败，显示错误信息
+                const errorMessage = response?.message || response?.msg || '删除失败';
+                ElMessage.error(errorMessage);
+              }
+            } else {
+              // 如果没有API，从本地数组中删除
+              const index = goals.value.findIndex(g => g.id === goal.id);
+              if (index > -1) {
+                goals.value.splice(index, 1);
+              }
+              ElMessage.success('删除成功');
+            }
+          } catch (error) {
+            console.error('删除目标失败:', error);
+            ElMessage.error('删除失败: ' + (error.response?.data?.message || error.message));
           }
-        }).catch(() => {})
+        }).catch(() => {
+          // 用户取消删除
+        })
       }
     }
 
@@ -387,22 +476,44 @@ export default {
                   enableReminder: goalForm.enableReminder
                 };
                 
-                window.$axios.put(`/goals/${editingGoal.value.id}`, goalData).then(response => {
+                // 准备认证头信息
+                const token = localStorage.getItem('token');
+                const headers = {};
+                if (token) {
+                  headers['Authorization'] = `Bearer ${token}`;
+                }
+                
+                window.$axios.put(`/goals/${editingGoal.value.id}`, goalData, {
+                  headers: headers
+                }).then(response => {
+                  // 根据与更新进度相同的问题，response本身是API响应体
+                  // response = {code: 200, message: '...', data: {更新后目标对象}, timestamp: '...'}
+                  
                   // 检查响应结构
-                  const resData = response?.data;
+                  const apiResponse = response;
                   
-                  // 检查成功状态
-                  const success = (resData?.code === 200 || resData?.code === 201) && resData?.data !== undefined;
+                  // 检查成功状态 - 支持201创建成功和200更新成功
+                  const isSuccess = (apiResponse?.code === 200 || apiResponse?.code === 201) && apiResponse?.data !== undefined;
                   
-                  if (success) {
+                  if (isSuccess) {
                     // 更新本地数据
-                    const updatedGoal = resData?.data;
+                    const updatedGoal = apiResponse?.data;
                     if (updatedGoal) {
+                      // 确定状态：优先使用后端返回的状态，但如果进度达到100%且状态仍为进行中，则应为已完成
+                      let status = updatedGoal.status === 'COMPLETED' || updatedGoal.status === 'completed' ? '已完成' : 
+                               updatedGoal.status === 'IN_PROGRESS' || updatedGoal.status === 'in_progress' ? '进行中' : 
+                               updatedGoal.status === 'CANCELLED' || updatedGoal.status === 'cancelled' ? '已取消' : '进行中';
+                      
+                      // 补充逻辑：如果进度达到100%，但状态还不是已完成，则更新为已完成
+                      if (updatedGoal.progress >= 100 && status === '进行中') {
+                        status = '已完成';
+                      }
+                      
                       Object.assign(editingGoal.value, {
                         title: updatedGoal.title,
                         description: updatedGoal.description,
                         progress: updatedGoal.progress,
-                        status: updatedGoal.status === 'COMPLETED' || updatedGoal.status === 'completed' ? '已完成' : updatedGoal.status === 'IN_PROGRESS' || updatedGoal.status === 'in_progress' ? '进行中' : updatedGoal.status === 'CANCELLED' || updatedGoal.status === 'cancelled' ? '已取消' : '进行中',
+                        status: status,
                         type: updatedGoal.type === 'LONG_TERM' ? 'long-term' : 'short-term',
                         targetDate: updatedGoal.targetDate,
                         enableReminder: updatedGoal.enableReminder
@@ -412,7 +523,9 @@ export default {
                     // 刷新目标列表以确保数据同步
                     loadData();
                   } else {
-                    ElMessage.error(resData?.message || resData?.msg || '更新失败');
+                    // 尝试从响应中获取错误信息
+                    const errorMessage = apiResponse?.message || apiResponse?.msg || response?.statusText || '更新失败';
+                    ElMessage.error(errorMessage);
                   }
                 }).catch(error => {
                   console.error('更新目标失败:', error);
@@ -445,23 +558,45 @@ export default {
                   enableReminder: goalForm.enableReminder
                 };
                 
-                window.$axios.post('/goals', goalData).then(response => {
+                // 准备认证头信息
+                const token = localStorage.getItem('token');
+                const headers = {};
+                if (token) {
+                  headers['Authorization'] = `Bearer ${token}`;
+                }
+                
+                window.$axios.post('/goals', goalData, {
+                  headers: headers
+                }).then(response => {
+                  // 根据与更新进度相同的问题，response本身是API响应体
+                  // response = {code: 201, message: '...', data: {新目标对象}, timestamp: '...'}
+                  
                   // 检查响应结构
-                  const resData = response?.data;
+                  const apiResponse = response;
                   
-                  // 检查成功状态
-                  const success = (resData?.code === 201 || resData?.code === 200) && resData?.data !== undefined;
+                  // 检查成功状态 - 支持201创建成功和200更新成功
+                  const isSuccess = (apiResponse?.code === 201 || apiResponse?.code === 200) && apiResponse?.data !== undefined;
                   
-                  if (success) {
+                  if (isSuccess) {
                     // 添加到本地数据
-                    const newGoal = resData?.data;
+                    const newGoal = apiResponse?.data;
                     if (newGoal) {
+                      // 确定状态：优先使用后端返回的状态，但如果进度达到100%且状态仍为进行中，则应为已完成
+                      let status = newGoal.status === 'COMPLETED' || newGoal.status === 'completed' ? '已完成' : 
+                               newGoal.status === 'IN_PROGRESS' || newGoal.status === 'in_progress' ? '进行中' : 
+                               newGoal.status === 'CANCELLED' || newGoal.status === 'cancelled' ? '已取消' : '进行中';
+                      
+                      // 补充逻辑：如果进度达到100%，但状态还不是已完成，则更新为已完成
+                      if (newGoal.progress >= 100 && status === '进行中') {
+                        status = '已完成';
+                      }
+                      
                       goals.value.push({
                         id: newGoal.id,
                         title: newGoal.title,
                         description: newGoal.description,
                         progress: newGoal.progress,
-                        status: newGoal.status === 'COMPLETED' || newGoal.status === 'completed' ? '已完成' : newGoal.status === 'IN_PROGRESS' || newGoal.status === 'in_progress' ? '进行中' : newGoal.status === 'CANCELLED' || newGoal.status === 'cancelled' ? '已取消' : '进行中',
+                        status: status,
                         type: newGoal.type === 'LONG_TERM' ? 'long-term' : 'short-term',
                         targetDate: newGoal.targetDate,
                         enableReminder: newGoal.enableReminder
@@ -471,7 +606,9 @@ export default {
                     // 刷新目标列表以确保数据同步
                     loadData();
                   } else {
-                    ElMessage.error(resData?.message || resData?.msg || '添加失败');
+                    // 尝试从响应中获取错误信息
+                    const errorMessage = apiResponse?.message || apiResponse?.msg || response?.statusText || '添加失败';
+                    ElMessage.error(errorMessage);
                   }
                 }).catch(error => {
                   console.error('添加目标失败:', error);
@@ -519,19 +656,47 @@ export default {
       if (currentProgressGoal.value) {
         try {
           if (window.$axios) {
+            console.log('Starting progress update...');
+            console.log('Axios instance:', window.$axios);
+            
+            // 准备认证头信息
+            const token = localStorage.getItem('token');
+            console.log('Token:', token);
+            const headers = {};
+            if (token) {
+              headers['Authorization'] = `Bearer ${token}`;
+            }
+            
+            console.log('Headers:', headers);
+            console.log('Progress form progress:', progressForm.progress);
+            console.log('Current goal ID:', currentProgressGoal.value.id);
+            
             // 使用API更新目标进度
-            window.$axios.patch(`/goals/${currentProgressGoal.value.id}/progress`, {
+            const response = await window.$axios.patch(`/goals/${currentProgressGoal.value.id}/progress`, {
               progress: progressForm.progress
-            }).then(response => {
-              // 检查响应结构
-              const resData = response?.data;
-              
-              // 检查成功状态
-              const success = (resData?.code === 200 || resData?.code === 201) && resData?.data !== undefined;
-              
-              if (success) {
-                // 更新本地数据
-                const updatedGoal = resData?.data;
+            }, {
+              headers: headers
+            });
+            
+            console.log('Progress update response:', response);
+
+            // 根据控制台输出，响应结构为：
+            // response = {code: 200, message: '...', data: {目标对象}, timestamp: '...'}
+            // 所以 response.data 是目标对象，response.code 是状态码
+
+            console.log('Full response:', response);
+
+            // 检查是否是 {code, message, data, timestamp} 格式
+            if (response && typeof response === 'object' && response.code !== undefined && response.data !== undefined) {
+              // 完整的API响应格式
+              const isSuccess = (response.code === 200 || response.code === 201);
+
+              console.log('Response code:', response.code);
+              console.log('Response data field exists:', response.data !== undefined);
+              console.log('Is success:', isSuccess);
+
+              if (isSuccess) {
+                const updatedGoal = response.data;
                 if (updatedGoal) {
                   currentProgressGoal.value.progress = updatedGoal.progress;
                   // 根据后端返回的状态值更新显示状态
@@ -542,28 +707,45 @@ export default {
                   } else if (updatedGoal.status === 'CANCELLED' || updatedGoal.status === 'cancelled') {
                     currentProgressGoal.value.status = '已取消';
                   }
+                  // 补充逻辑：如果进度达到100%，但状态还不是已完成，则更新为已完成
+                  else if (updatedGoal.progress >= 100 && currentProgressGoal.value.status !== '已完成') {
+                    currentProgressGoal.value.status = '已完成';
+                  }
                 }
+                console.log('Progress update successful, showing success message');
                 ElMessage.success('进度更新成功');
                 // 刷新目标列表以确保数据同步
+                console.log('Calling loadData to refresh data');
                 loadData();
+                console.log('Data refresh initiated');
               } else {
-                ElMessage.error(resData?.message || resData?.msg || '更新失败');
+                // 尝试从响应中获取错误信息
+                const errorMessage = response.message || response.msg || '更新失败';
+                console.log('Failed to update progress, showing error:', errorMessage);
+                ElMessage.error(errorMessage);
               }
-            }).catch(error => {
-              console.error('更新进度失败:', error);
-              ElMessage.error('更新失败: ' + (error.response?.data?.message || error.message));
-            });
-          } else {
-            // 如果没有API，更新本地数据
-            currentProgressGoal.value.progress = progressForm.progress
-            if (progressForm.progress >= 100) {
-              currentProgressGoal.value.status = '已完成'
+            } else {
+              // 不是预期的API响应格式
+              console.log('Unexpected response format');
+              ElMessage.error('更新失败: 响应格式异常');
             }
-            ElMessage.success('进度更新成功')
           }
         } catch (error) {
           console.error('更新进度失败:', error);
-          ElMessage.error('更新失败: ' + (error.response?.data?.message || error.message));
+          console.error('Error details:', error.response || error.message || error);
+              
+          // 根据错误类型提供更准确的错误信息
+          if (error.response) {
+            // 服务器返回了错误响应
+            const errorMsg = error.response.data?.message || error.response.statusText || '服务器错误';
+            ElMessage.error(`更新失败: ${errorMsg} (${error.response.status})`);
+          } else if (error.request) {
+            // 请求已发出但没有收到响应（网络错误等）
+            ElMessage.error('网络连接失败，请检查网络后重试');
+          } else {
+            // 其他错误
+            ElMessage.error('更新失败: ' + (error.message || '未知错误'));
+          }
         } finally {
           showProgressDialog.value = false
         }
@@ -573,18 +755,30 @@ export default {
     const updateReminder = async (goal) => {
       try {
         if (window.$axios) {
+          // 准备认证头信息
+          const token = localStorage.getItem('token');
+          const headers = {};
+          if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+          }
+          
           // 使用API更新提醒设置
           window.$axios.patch(`/goals/${goal.id}/reminder`, {
             enableReminder: !goal.enableReminder
+          }, {
+            headers: headers
           }).then(response => {
+            // 根据与更新进度相同的问题，response本身是API响应体
+            // response = {code: 200, message: '...', data: {更新后目标对象}, timestamp: '...'}
+            
             // 检查响应结构
-            const resData = response?.data;
+            const apiResponse = response;
             
-            // 检查成功状态
-            const success = (resData?.code === 200 || resData?.code === 201) && resData?.data !== undefined;
+            // 检查成功状态 - 支持201创建成功和200更新成功
+            const isSuccess = (apiResponse?.code === 200 || apiResponse?.code === 201) && apiResponse?.data !== undefined;
             
-            if (success) {
-              const updatedGoal = resData?.data;
+            if (isSuccess) {
+              const updatedGoal = apiResponse?.data;
               if (updatedGoal) {
                 goal.enableReminder = updatedGoal.enableReminder;
                 // 同时更新状态，以防后端逻辑改变了状态
@@ -595,12 +789,18 @@ export default {
                 } else if (updatedGoal.status === 'CANCELLED' || updatedGoal.status === 'cancelled') {
                   goal.status = '已取消';
                 }
+                // 补充逻辑：如果进度达到100%，但状态还不是已完成，则更新为已完成
+                else if (updatedGoal.progress >= 100 && goal.status !== '已完成') {
+                  goal.status = '已完成';
+                }
               }
               ElMessage.success(`提醒已${goal.enableReminder ? '开启' : '关闭'}`);
               // 刷新目标列表以确保数据同步
               loadData();
             } else {
-              ElMessage.error(resData?.message || resData?.msg || '更新失败');
+              // 尝试从响应中获取错误信息
+              const errorMessage = apiResponse?.message || apiResponse?.msg || response?.statusText || '更新失败';
+              ElMessage.error(errorMessage);
             }
           }).catch(error => {
             console.error('更新提醒设置失败:', error);

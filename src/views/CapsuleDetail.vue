@@ -307,6 +307,16 @@ export default {
             ElMessage.success('时间胶囊开启成功！')
             // 重新加载详情
             await loadCapsule()
+            
+            // 检查并更新成就
+            try {
+              const achievementResponse = await window.$axios.post('/achievements/check');
+              if (achievementResponse?.code === 200 && achievementResponse?.data && achievementResponse.data.length > 0) {
+                ElMessage.success(`恭喜！获得了 ${achievementResponse.data.length} 个新成就`);
+              }
+            } catch (achievementError) {
+              console.error('检查成就失败:', achievementError);
+            }
           } else {
             ElMessage.error(response?.message || '开启失败')
           }

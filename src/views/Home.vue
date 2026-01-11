@@ -16,7 +16,7 @@
           <p class="bio">{{ userInfo.bio || '记录生活点滴，遇见更好的自己' }}</p>
           <div class="user-stats">
             <div class="stat-item">
-              <span class="stat-value">{{ capsules.length }}</span>
+              <span class="stat-value">{{ capsuleCount }}</span>
               <span class="stat-label">时间胶囊</span>
             </div>
             <div class="stat-item">
@@ -149,7 +149,8 @@ export default {
         bio: ''
       },
       completedGoals: 0,
-      achievements: 0
+      achievements: 0,
+      capsuleCount: 0
     }
   },
   computed: {
@@ -301,6 +302,7 @@ export default {
             }
             
             // 更新统计数值，但保留实际胶囊列表
+            this.capsuleCount = statsResponse.data.capsuleCount || 0;
             this.completedGoals = statsResponse.data.completedGoals || 0;
             this.achievements = statsResponse.data.achievements || 0;
             
@@ -310,9 +312,12 @@ export default {
             const capsulesResponse = await window.$axios.get('/capsules');
             if (capsulesResponse?.data?.content) {
               this.capsules = capsulesResponse.data.content;
+              // 设置胶囊总数为列表长度
+              this.capsuleCount = capsulesResponse.data.content.length;
               console.log('使用capsules API数据:', capsulesResponse.data.content);
             } else {
               this.capsules = [];
+              this.capsuleCount = 0;
             }
             
             // 单独获取统计信息
