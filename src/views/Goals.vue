@@ -65,7 +65,7 @@
           <el-progress 
             :percentage="goal.progress" 
             :status="goal.status === '已完成' ? 'success' : ''"
-            :stroke-width="20"
+            :stroke-width="10"
             :format="() => `${goal.progress}%`"
           />
         </div>
@@ -927,25 +927,49 @@ p {
 
 /* 图表卡片 */
 .chart-card {
-  margin-bottom: 20px;
+  margin-bottom: 15px;
 }
 
 .chart-container {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.chart-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+.chart-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 2px;
+}
+
+.chart-container::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 2px;
+}
+
+.chart-container::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
 
 .chart-item {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 
 .chart-label {
-  font-size: 14px;
+  font-size: 12px;
   color: #666;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 目标列表 */
