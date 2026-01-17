@@ -38,21 +38,84 @@
       </div>
     </el-card>
 
-    <!-- 今日目标进度 -->
-    <el-card class="goal-progress-card">
-      <template #header>
-        <div class="card-header">
-          <span>📝 今日目标</span>
-          <el-tag type="success" v-if="todayGoalProgress >= 100">已完成</el-tag>
+    <!-- 今日目标进度和日历板块容器 -->
+    <div class="goal-calendar-container">
+      <!-- 今日目标进度 -->
+      <el-card class="goal-progress-card">
+        <template #header>
+          <div class="card-header">
+            <span>📝 今日目标</span>
+            <el-tag type="success" v-if="todayGoalProgress >= 100">已完成</el-tag>
+          </div>
+        </template>
+        <div class="progress-content">
+          <p class="goal-text">完成 1 封时间胶囊</p>
+          <el-progress :percentage="todayGoalProgress" :status="todayGoalProgress >= 100 ? 'success' : ''"
+            :stroke-width="12" />
+          <p class="progress-text">{{ todayGoalProgress }}% 完成</p>
         </div>
-      </template>
-      <div class="progress-content">
-        <p class="goal-text">完成 1 封时间胶囊</p>
-        <el-progress :percentage="todayGoalProgress" :status="todayGoalProgress >= 100 ? 'success' : ''"
-          :stroke-width="12" />
-        <p class="progress-text">{{ todayGoalProgress }}% 完成</p>
-      </div>
-    </el-card>
+      </el-card>
+      
+      <!-- 日历板块 -->
+      <el-card class="calendar-card">
+        <template #header>
+          <div class="card-header">
+            <span>📅 本月日历</span>
+          </div>
+        </template>
+        <div class="calendar-content">
+          <div class="calendar-header">
+            <button @click="prevMonth" class="nav-btn">&lt;</button>
+            <span class="month-year">{{ currentMonthYear }}</span>
+            <button @click="nextMonth" class="nav-btn">&gt;</button>
+          </div>
+          <div class="weekdays">
+            <span v-for="day in weekdays" :key="day" class="weekday">{{ day }}</span>
+          </div>
+          <div class="days-grid">
+            <div 
+              v-for="day in days" 
+              :key="day.date" 
+              :class="[
+                'day',
+                { 'other-month': day.isOtherMonth },
+                { 'today': day.isToday },
+                { 'has-event': day.hasEvent },
+                { 'has-capsule-event': day.hasCapsuleEvent },
+                { 'has-goal-event': day.hasGoalEvent },
+                { 'has-goal-completed-event': day.hasGoalCompletedEvent }
+              ]"
+              @click="selectDate(day.date)"
+              @mouseenter="showTooltip($event, day)"
+              @mouseleave="hideTooltip"
+            >
+              {{ day.date.getDate() }}
+              <div v-show="tooltipVisible && tooltipDate.getTime() === day.date.getTime()" 
+                   class="tooltip" 
+                   :style="tooltipStyle">
+                <div class="tooltip-content">
+                  <strong>{{ day.date.getFullYear() }}年{{ day.date.getMonth() + 1 }}月{{ day.date.getDate() }}日</strong>
+                  <div v-if="hasEventsOnDate(day.date)" class="events-list">
+                    <div v-for="event in getEventsOnDate(day.date)" :key="event.id" class="event-item">
+                      <span v-if="event.type === 'goal' && event.subtype === 'completed'">✅</span>
+                      <span v-else-if="event.type === 'goal' && event.subtype === 'created'">🎯</span>
+                      <span v-else-if="event.type !== 'goal'">胶囊</span>
+                      {{ event.title }}
+                      <span v-if="event.subtype === 'completed' && event.createdAt" class="event-status">
+                        (耗时 {{ calculateGoalDuration(event.createdAt, event.date) }} 天)
+                      </span>
+                    </div>
+                  </div>
+                  <div v-else class="no-events">
+                    无活动
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </el-card>
+    </div>
 
     <!-- 最近的时间胶囊 -->
     <div class="section-header">
@@ -150,13 +213,26 @@ export default {
       },
       completedGoals: 0,
       achievements: 0,
-      capsuleCount: 0
+      capsuleCount: 0,
+      // 日历相关数据
+      currentDate: new Date(),
+      weekdays: ['日', '一', '二', '三', '四', '五', '六'],
+      // 悬浮提示相关数据
+      tooltipVisible: false,
+      tooltipDate: null,
+      tooltipStyle: {}
     }
   },
+  
   computed: {
     recentCapsules() {
-      // 返回最近6个胶囊
-      return this.capsules.slice(0, 6).map(capsule => ({
+      // 返回最近6个时间胶囊，排除目标事件
+      const capsuleItems = this.capsules.filter(item => {
+        // 只包含非目标类型的项目（即时间胶囊）
+        return !item.type || item.type === undefined || item.type === 'capsule';
+      });
+      
+      return capsuleItems.slice(0, 6).map(capsule => ({
         ...capsule,
         cover: capsule.coverImage || capsule.cover || '',
         preview: capsule.content?.substring(0, 50) || ''
@@ -164,18 +240,87 @@ export default {
     },
     todayGoalProgress() {
       // 计算今日目标完成进度（示例：如果有今日创建的胶囊则100%）
-      const today = new Date().toISOString().split('T')[0]
+      const today = this.formatDateWithoutTime(new Date())
       const todayCapsules = this.capsules.filter(c => {
         // 检查多种可能的日期字段
         const capsuleDate = c.date || c.createdAt || c.created_at || c.openDate || c.open_date;
         if (!capsuleDate) return false;
         // 提取日期部分进行比较
-        const dateStr = new Date(capsuleDate).toISOString().split('T')[0];
+        const dateStr = this.formatDateWithoutTime(new Date(capsuleDate));
         return dateStr === today;
       });
       return todayCapsules.length > 0 ? 100 : 0
+    },
+    // 日历相关计算属性
+    currentMonthYear() {
+      return `${this.currentDate.getFullYear()}年${this.currentDate.getMonth() + 1}月`;
+    },
+    days() {
+      const year = this.currentDate.getFullYear();
+      const month = this.currentDate.getMonth();
+      
+      // 获取当月第一天和最后一天
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      
+      // 获取当月第一天是星期几
+      const firstDayOfWeek = firstDay.getDay();
+      
+      // 获取当月总天数
+      const daysInMonth = lastDay.getDate();
+      
+      // 生成日历天数数组
+      const days = [];
+      
+      // 添加上个月的日期
+      const prevMonthLastDay = new Date(year, month, 0).getDate();
+      for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+        const date = new Date(year, month - 1, prevMonthLastDay - i);
+        days.push({
+          date,
+          isOtherMonth: true,
+          isToday: false,
+          hasEvent: this.hasEventOnDate(date),
+          hasCapsuleEvent: this.hasCapsuleEventOnDate(date),
+          hasGoalEvent: this.hasGoalEventOnDate(date),
+          hasGoalCompletedEvent: this.hasGoalCompletedEventOnDate(date)
+        });
+      }
+      
+      // 添加当月的日期
+      const today = new Date();
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(year, month, day);
+        days.push({
+          date,
+          isOtherMonth: false,
+          isToday: date.toDateString() === today.toDateString(),
+          hasEvent: this.hasEventOnDate(date),
+          hasCapsuleEvent: this.hasCapsuleEventOnDate(date),
+          hasGoalEvent: this.hasGoalEventOnDate(date),
+          hasGoalCompletedEvent: this.hasGoalCompletedEventOnDate(date)
+        });
+      }
+      
+      // 添加下个月的日期
+      const remainingDays = 42 - days.length; // 6行7列共42个格子
+      for (let day = 1; day <= remainingDays; day++) {
+        const date = new Date(year, month + 1, day);
+        days.push({
+          date,
+          isOtherMonth: true,
+          isToday: false,
+          hasEvent: this.hasEventOnDate(date),
+          hasCapsuleEvent: this.hasCapsuleEventOnDate(date),
+          hasGoalEvent: this.hasGoalEventOnDate(date),
+          hasGoalCompletedEvent: this.hasGoalCompletedEventOnDate(date)
+        });
+      }
+      
+      return days;
     }
   },
+  
   async mounted() {
     console.log('Home组件挂载');
     await this.loadUserInfo()
@@ -191,6 +336,164 @@ export default {
   },
   
   methods: {
+    // 悬停提示相关方法
+    showTooltip(event, day) {
+      this.tooltipVisible = true;
+      this.tooltipDate = day.date;
+      
+      // 计算工具提示的位置
+      const rect = event.target.getBoundingClientRect();
+      this.tooltipStyle = {
+        top: rect.bottom + window.scrollY + 5 + 'px',
+        left: rect.left + window.scrollX + 'px',
+        position: 'fixed',
+        zIndex: 1000
+      };
+    },
+    
+    hideTooltip() {
+      this.tooltipVisible = false;
+    },
+    
+    hasEventsOnDate(date) {
+      const dateStr = this.formatDateWithoutTime(date);
+      return this.capsules.some(c => {
+        const capsuleDate = c.date || c.createdAt || c.created_at || c.openDate || c.open_date;
+        if (!capsuleDate) return false;
+        const capsuleDateStr = this.formatDateWithoutTime(new Date(capsuleDate));
+        return capsuleDateStr === dateStr;
+      });
+    },
+    
+    getEventsOnDate(date) {
+      const dateStr = this.formatDateWithoutTime(date);
+      return this.capsules.filter(item => {
+        // 处理胶囊事件
+        if (!item.type || item.type === undefined || item.type === 'capsule') {
+          const capsuleDate = item.date || item.createdAt || item.created_at || item.openDate || item.open_date;
+          if (!capsuleDate) return false;
+          const capsuleDateStr = this.formatDateWithoutTime(new Date(capsuleDate));
+          return capsuleDateStr === dateStr;
+        }
+        // 处理目标事件
+        else if (item.type === 'goal') {
+          // 根据子类型决定日期字段
+          let eventDate;
+          if (item.subtype === 'created') {
+            // 目标创建事件使用创建日期
+            eventDate = item.date;
+          } else if (item.subtype === 'completed') {
+            // 目标完成事件使用完成日期
+            eventDate = item.date;
+          } else {
+            // 默认使用创建日期
+            eventDate = item.date || item.createdAt || item.createTime || item.created_at;
+          }
+          if (!eventDate) return false;
+          const eventDateStr = this.formatDateWithoutTime(new Date(eventDate));
+          return eventDateStr === dateStr;
+        }
+        return false;
+      }).slice(0, 3); // 限制最多显示3个事件
+    },
+    
+    // 日历相关方法
+    prevMonth() {
+      this.currentDate = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth() - 1, 1);
+    },
+    
+    nextMonth() {
+      this.currentDate = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth() + 1, 1);
+    },
+    
+    selectDate(date) {
+      // 这里可以添加选中日期的处理逻辑
+      console.log('选中日期:', date);
+    },
+    
+    hasEventOnDate(date) {
+      // 检查指定日期是否有事件（例如：创建了时间胶囊或完成目标）
+      // 这里可以根据实际业务需求实现
+      const dateStr = this.formatDateWithoutTime(date);
+      
+      // 检查当天是否有胶囊创建
+      const capsulesOnDate = this.capsules.filter(c => {
+        const capsuleDate = c.date || c.createdAt || c.created_at || c.openDate || c.open_date;
+        if (!capsuleDate) return false;
+        const capsuleDateStr = this.formatDateWithoutTime(new Date(capsuleDate));
+        return capsuleDateStr === dateStr;
+      });
+      
+      // 检查当天是否有目标完成（可以根据实际业务逻辑调整）
+      
+      return capsulesOnDate.length > 0;
+    },
+    
+    // 辅助方法：格式化日期为 YYYY-MM-DD 格式，不考虑时间
+    formatDateWithoutTime(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    },
+    
+    // 检查指定日期是否有胶囊事件
+    hasCapsuleEventOnDate(date) {
+      const dateStr = this.formatDateWithoutTime(date);
+      return this.capsules.some(item => {
+        // 检查是否是胶囊类型
+        if (!item.type || item.type === undefined || item.type === 'capsule') {
+          const capsuleDate = item.date || item.createdAt || item.created_at || item.openDate || item.open_date;
+          if (!capsuleDate) return false;
+          const capsuleDateStr = this.formatDateWithoutTime(new Date(capsuleDate));
+          return capsuleDateStr === dateStr;
+        }
+        return false;
+      });
+    },
+    
+    // 检查指定日期是否有目标事件
+    hasGoalEventOnDate(date) {
+      const dateStr = this.formatDateWithoutTime(date);
+      return this.capsules.some(item => {
+        // 检查是否是目标类型
+        if (item.type === 'goal') {
+          const goalDate = item.createdAt || item.createTime || item.created_at || item.date;
+          if (!goalDate) return false;
+          const goalDateStr = this.formatDateWithoutTime(new Date(goalDate));
+          return goalDateStr === dateStr;
+        }
+        return false;
+      });
+    },
+    
+    // 检查指定日期是否有目标完成事件
+    hasGoalCompletedEventOnDate(date) {
+      const dateStr = this.formatDateWithoutTime(date);
+      return this.capsules.some(item => {
+        // 检查是否是目标完成类型
+        if (item.type === 'goal' && item.subtype === 'completed') {
+          const goalDate = item.date;
+          if (!goalDate) return false;
+          const goalDateStr = this.formatDateWithoutTime(new Date(goalDate));
+          return goalDateStr === dateStr;
+        }
+        return false;
+      });
+    },
+    
+    // 计算目标完成所用天数
+    calculateGoalDuration(startDateStr, endDateStr) {
+      const startDate = new Date(startDateStr);
+      const endDate = new Date(endDateStr);
+      
+      // 计算相差的天数，加1是因为包含开始和结束的当天
+      const timeDiff = endDate.getTime() - startDate.getTime();
+      const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
+      
+      return Math.max(1, daysDiff); // 至少返回1天
+    },
+    
     handleStorageChange(e) {
       if (e.key === 'capsuleCreated' && e.newValue) {
         // 当检测到胶囊创建事件时，重新获取数据
@@ -330,6 +633,54 @@ export default {
             } catch (statsError) {
               console.error('获取统计数据失败:', statsError);
             }
+          }
+          
+          // 获取目标数据用于日历显示
+          try {
+            const goalsResponse = await window.$axios.get('/goals', { params: { page: 0, size: 100 } });
+            if (goalsResponse?.data?.content) {
+              // 将目标数据添加到capsules数组中，以便在日历上显示
+              const goals = Array.isArray(goalsResponse.data.content) ? goalsResponse.data.content : [];
+              
+              // 创建目标事件数组
+              let goalEvents = [];
+              
+              // 为目标创建和完成创建单独的事件
+              goals.forEach(goal => {
+                // 添加目标创建事件
+                goalEvents.push({
+                  ...goal,
+                  id: `${goal.id}-created`,
+                  type: 'goal',
+                  subtype: 'created',
+                  title: `创建: ${goal.title}`,
+                  date: goal.createdAt || goal.createTime || goal.created_at || new Date().toISOString(),
+                  originalId: goal.id
+                });
+                
+                // 如果目标已完成，添加目标完成事件
+                if ((goal.status === 'COMPLETED' || goal.status === 'completed') && goal.completedAt) {
+                  goalEvents.push({
+                    ...goal,
+                    id: `${goal.id}-completed`,
+                    type: 'goal',
+                    subtype: 'completed',
+                    title: `完成: ${goal.title}`,
+                    date: goal.completedAt,
+                    createdAt: goal.createdAt || goal.createTime || goal.created_at || new Date().toISOString(),
+                    completedAt: goal.completedAt,
+                    originalId: goal.id
+                  });
+                }
+              });
+              
+              // 将目标事件合并到capsules数组中
+              this.capsules = [...this.capsules, ...goalEvents];
+              
+              console.log('加载的目标数据:', goals);
+            }
+          } catch (goalsError) {
+            console.error('获取目标数据失败:', goalsError);
           }
         } else {
           // 如果没有axios，使用fetch
@@ -526,9 +877,289 @@ export default {
   margin-top: 4px;
 }
 
+/* 今日目标进度和日历容器 */
+.goal-calendar-container {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
 /* 今日目标进度卡片 */
 .goal-progress-card {
-  margin-bottom: 30px;
+  flex: 1;
+  min-width: 300px;
+  margin-bottom: 0;
+}
+
+/* 日历卡片 */
+.calendar-card {
+  flex: 1;
+  min-width: 300px;
+  margin-bottom: 0;
+}
+
+.calendar-content {
+  padding: 10px 0;
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.nav-btn {
+  background: #f5f7fa;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.nav-btn:hover {
+  background: #ecf5ff;
+  color: #409eff;
+}
+
+.month-year {
+  font-weight: 600;
+  color: #333;
+}
+
+.weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 5px;
+}
+
+.weekday {
+  text-align: center;
+  font-size: 12px;
+  color: #666;
+  padding: 5px 0;
+}
+
+.days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.day {
+  text-align: center;
+  padding: 8px 0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+  transition: all 0.3s;
+  position: relative;
+}
+
+.day:hover {
+  background: #f5f7fa;
+}
+
+.day.other-month {
+  color: #ccc;
+}
+
+.day.today {
+  background: #409eff;
+  color: white;
+  font-weight: bold;
+}
+
+.day.has-event::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background: #409eff;
+  border-radius: 50%;
+}
+
+.day.has-capsule-event:not(.has-goal-event)::after,
+.day.has-goal-event:not(.has-capsule-event)::after {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.day.has-capsule-event:not(.has-goal-event)::after {
+  background: #409eff; /* 蓝色 - 仅胶囊事件 */
+}
+
+.day.has-goal-event:not(.has-capsule-event)::after {
+  background: #e6a23c; /* 橙色 - 仅目标事件 */
+}
+
+/* 当同一天既有胶囊事件又有目标事件时，显示两个分开的小点 */
+.day.has-capsule-event.has-goal-event:not(.has-goal-completed-event)::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 40%;
+  width: 4px;
+  height: 4px;
+  background: #409eff; /* 蓝色 - 胶囊 */
+  border-radius: 50%;
+}
+
+.day.has-capsule-event.has-goal-event:not(.has-goal-completed-event)::before {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 60%;
+  width: 4px;
+  height: 4px;
+  background: #e6a23c; /* 橙色 - 目标 */
+  border-radius: 50%;
+}
+
+/* 目标完成事件 */
+.day.has-goal-completed-event:not(.has-capsule-event):not(.has-goal-event)::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  background: #67c23a; /* 绿色 - 目标完成 */
+  border-radius: 50%;
+}
+
+/* 当同一天有目标完成事件和胶囊事件时 */
+.day.has-goal-completed-event.has-capsule-event:not(.has-goal-event)::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 35%;
+  width: 4px;
+  height: 4px;
+  background: #409eff; /* 蓝色 - 胶囊 */
+  border-radius: 50%;
+}
+
+.day.has-goal-completed-event.has-capsule-event:not(.has-goal-event)::before {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 65%;
+  width: 4px;
+  height: 4px;
+  background: #67c23a; /* 绿色 - 目标完成 */
+  border-radius: 50%;
+}
+
+/* 当同一天有目标完成事件和目标创建事件时 */
+.day.has-goal-completed-event.has-goal-event:not(.has-capsule-event)::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 35%;
+  width: 4px;
+  height: 4px;
+  background: #e6a23c; /* 橙色 - 目标创建 */
+  border-radius: 50%;
+}
+
+.day.has-goal-completed-event.has-goal-event:not(.has-capsule-event)::before {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 65%;
+  width: 4px;
+  height: 4px;
+  background: #67c23a; /* 绿色 - 目标完成 */
+  border-radius: 50%;
+}
+
+/* 当一天有三个事件时 */
+.day.has-goal-completed-event.has-goal-event.has-capsule-event::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 30%;
+  width: 4px;
+  height: 4px;
+  background: #409eff; /* 蓝色 - 胶囊 */
+  border-radius: 50%;
+}
+
+.day.has-goal-completed-event.has-goal-event.has-capsule-event::before {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  background: #e6a23c; /* 橙色 - 目标创建 */
+  border-radius: 50%;
+}
+
+.day.has-goal-completed-event.has-goal-event.has-capsule-event::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 70%;
+  width: 4px;
+  height: 4px;
+  background: #67c23a; /* 绿色 - 目标完成 */
+  border-radius: 50%;
+}
+
+.tooltip {
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  border-radius: 4px;
+  padding: 10px;
+  font-size: 14px;
+  min-width: 200px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+.tooltip-content strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #fff;
+}
+
+.events-list {
+  margin-top: 5px;
+}
+
+.event-item {
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.event-item:last-child {
+  border-bottom: none;
+}
+
+.no-events {
+  color: #aaa;
+  font-style: italic;
+  padding: 4px 0;
+}
+
+.event-status {
+  color: #67c23a;
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+@media (max-width: 768px) {
+  .goal-calendar-container {
+    flex-direction: column;
+  }
 }
 
 .card-header {
