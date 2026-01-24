@@ -30,7 +30,7 @@
               />
             </el-form-item>
             <div class="form-options">
-              <el-checkbox v-model="loginForm.remember">记住我</el-checkbox>
+              <el-checkbox v-model="loginForm.remember">3天内自动登录</el-checkbox>
               <el-link type="primary" :underline="false" @click="showForgotPassword = true">
                 忘记密码？
               </el-link>
@@ -75,7 +75,7 @@
             <el-form-item prop="nickname">
               <el-input
                 v-model="registerForm.nickname"
-                placeholder="昵称"
+                placeholder="昵称（可选）"
                 prefix-icon="User"
                 size="large"
               />
@@ -87,23 +87,7 @@
         </el-tab-pane>
       </el-tabs>
 
-      <!-- 第三方登录 -->
-      <div class="third-party-login">
-        <div class="divider">
-          <span>或使用第三方账号登录</span>
-        </div>
-        <div class="social-login">
-          <el-button circle class="social-btn wechat" @click="handleSocialLogin('wechat')">
-            <el-icon><ChatDotRound /></el-icon>
-          </el-button>
-          <el-button circle class="social-btn qq" @click="handleSocialLogin('qq')">
-            <el-icon><Message /></el-icon>
-          </el-button>
-          <el-button circle class="social-btn weibo" @click="handleSocialLogin('weibo')">
-            <el-icon><Share /></el-icon>
-          </el-button>
-        </div>
-      </div>
+
     </div>
 
     <!-- 忘记密码对话框 -->
@@ -134,7 +118,7 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { User, Lock, ChatDotRound, Message, Share } from '@element-plus/icons-vue'
+import { User, Lock } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const activeTab = ref('login')
@@ -168,7 +152,31 @@ const forgotForm = reactive({
 // 登录验证规则
 const loginRules = {
   account: [
-    { required: true, message: '请输入邮箱或手机号', trigger: 'blur' }
+    { required: true, message: '请输入邮箱或手机号', trigger: 'blur' },
+    {
+      validator: (rule, value, callback) => {
+        // 验证邮箱格式
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        // 验证手机号格式
+        const phoneRegex = /^1[3-9]\d{9}$/;
+        
+        if (value === '') {
+          callback(); // 如果为空，让required规则处理
+        } else if (emailRegex.test(value)) {
+          callback();
+        } else if (phoneRegex.test(value)) {
+          callback();
+        } else {
+          // 判断是邮箱格式还是手机号格式
+          if (value.includes('@')) {
+            callback(new Error('邮箱格式不正确，请检查邮箱地址'));
+          } else {
+            callback(new Error('手机号格式不正确，请检查手机号码'));
+          }
+        }
+      },
+      trigger: 'blur'
+    }
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
@@ -179,7 +187,29 @@ const loginRules = {
 // 注册验证规则
 const registerRules = {
   account: [
-    { required: true, message: '请输入邮箱或手机号', trigger: 'blur' }
+    { required: true, message: '请输入邮箱或手机号', trigger: 'blur' },
+    {
+      validator: (rule, value, callback) => {
+        // 验证邮箱格式
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        // 验证手机号格式
+        const phoneRegex = /^1[3-9]\d{9}$/;
+        
+        if (emailRegex.test(value)) {
+          callback();
+        } else if (phoneRegex.test(value)) {
+          callback();
+        } else {
+          // 判断是邮箱格式还是手机号格式
+          if (value.includes('@')) {
+            callback(new Error('邮箱格式不正确，请检查邮箱地址'));
+          } else {
+            callback(new Error('手机号格式不正确，请检查手机号码'));
+          }
+        }
+      },
+      trigger: 'blur'
+    }
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
@@ -199,7 +229,6 @@ const registerRules = {
     }
   ],
   nickname: [
-    { required: true, message: '请输入昵称', trigger: 'blur' },
     { min: 2, message: '昵称长度至少2位', trigger: 'blur' }
   ]
 }
@@ -240,11 +269,58 @@ const handleLogin = async () => {
               ElMessage.success('登录成功');
               router.push('/');
             } else {
-              ElMessage.error(response?.message || '登录失败');
+              // 优化登录错误处理，根据不同的错误类型显示不同的提示
+              const message = response?.message || response?.msg || '登录失败';
+              
+              if (response?.code === 404 || message.includes('账号不存在') || message.includes('用户不存在') || message.includes('incorrect') || message.includes('invalid')) {
+                ElMessage.error('账号不存在，请检查账号是否正确');
+              } else if (message.includes('密码') || message.includes('password')) {
+                ElMessage.error('密码错误，请重新输入');
+              } else if (message.includes('格式') || message.includes('format')) {
+                ElMessage.error('账号格式错误，请检查邮箱或手机号格式');
+              } else if (message.includes('禁用') || message.includes('disabled')) {
+                ElMessage.error('账号已被禁用，请联系管理员');
+              } else {
+                ElMessage.error(message || '登录失败，请检查账号和密码');
+              }
             }
           }).catch(error => {
             console.error('登录失败:', error);
-            ElMessage.error('登录失败: ' + (error.response?.data?.message || error.message));
+            // 优化登录错误处理，根据不同的错误类型显示不同的提示
+            if (error.response) {
+              // 服务器响应了错误状态
+              const status = error.response.status;
+              const message = error.response.data?.message || error.response.data?.msg || '登录失败';
+              
+              if (status === 404 || message.includes('账号不存在') || message.includes('用户不存在') || message.includes('incorrect') || message.includes('invalid')) {
+                ElMessage.error('账号不存在，请检查账号是否正确');
+              } else if (status === 401 || message.includes('未授权') || message.includes('unauthorized')) {
+                ElMessage.error('登录已过期，请重新登录');
+              } else if (status === 400 || message.includes('格式') || message.includes('format')) {
+                ElMessage.error('账号格式错误，请检查邮箱或手机号格式');
+              } else if (status === 403 || message.includes('禁用') || message.includes('disabled')) {
+                ElMessage.error('账号已被禁用，请联系管理员');
+              } else if (status === 429 || message.includes('频繁') || message.includes('rate limit')) {
+                ElMessage.error('登录尝试过于频繁，请稍后再试');
+              } else {
+                // 尝试从错误信息中提取更具体的错误原因
+                if (message.includes('password') || message.includes('密码')) {
+                  ElMessage.error('密码错误，请重新输入');
+                } else if (message.includes('email')) {
+                  ElMessage.error('邮箱格式错误，请检查邮箱地址');
+                } else if (message.includes('phone')) {
+                  ElMessage.error('手机号格式错误，请检查手机号码');
+                } else {
+                  ElMessage.error(message || '登录失败，请检查账号和密码');
+                }
+              }
+            } else if (error.request) {
+              // 请求已发出但没有收到响应
+              ElMessage.error('网络连接失败，请检查网络后重试');
+            } else {
+              // 其他错误
+              ElMessage.error('发生未知错误，请稍后再试');
+            }
           });
         } else {
           ElMessage.error('API服务不可用');
@@ -259,6 +335,24 @@ const handleLogin = async () => {
   })
 }
 
+// 保存用户数据并跳转到首页
+const saveUserDataAndRedirect = (userData, token) => {
+  localStorage.setItem('user', JSON.stringify({
+    account: userData.account || registerForm.account,
+    nickname: userData.nickname || (registerForm.nickname || registerForm.account),
+    avatar: userData.avatar || ''
+  }));
+  
+  // 保存token
+  localStorage.setItem('token', token);
+  
+  // 触发自定义事件通知App.vue更新用户信息
+  window.dispatchEvent(new CustomEvent('user-login'));
+  
+  ElMessage.success('注册成功');
+  router.push('/');
+};
+
 // 处理注册
 const handleRegister = async () => {
   if (!registerFormRef.value) return
@@ -268,10 +362,13 @@ const handleRegister = async () => {
       try {
         if (window.$axios) {
           // 使用API注册
+          // 如果用户未填写昵称，使用账号（手机号或邮箱）作为昵称
+          const nickname = registerForm.nickname || registerForm.account;
+          
           const registerData = {
             account: registerForm.account,
             password: registerForm.password,
-            nickname: registerForm.nickname
+            nickname: nickname
           };
           
           window.$axios.post('/register', registerData).then(response => {
@@ -279,32 +376,105 @@ const handleRegister = async () => {
             if (response?.code === 201 && response?.data) {
               // 保存用户信息和token到本地存储
               const userData = response.data;
-              const token = userData.token;
+              // 从响应中直接获取token，可能在顶级或嵌套在data中
+              const token = response.data.token || response.data?.data?.token;
               
-              if (userData && token) {
-                localStorage.setItem('user', JSON.stringify({
-                  account: userData.account || registerForm.account,
-                  nickname: userData.nickname || registerForm.nickname,
-                  avatar: userData.avatar || ''
-                }));
-                
-                // 保存token
-                localStorage.setItem('token', token);
-                
-                // 触发自定义事件通知App.vue更新用户信息
-                window.dispatchEvent(new CustomEvent('user-login'));
-                
-                ElMessage.success('注册成功');
-                router.push('/');
+              if (userData) {
+                // 如果有token，直接使用；否则尝试自动登录获取token
+                if (token) {
+                  // 直接使用返回的token
+                  saveUserDataAndRedirect(userData, token);
+                } else {
+                  // 尝试使用刚注册的账号和密码进行登录以获取token
+                  window.$axios.post('/login', {
+                    account: registerForm.account,
+                    password: registerForm.password,
+                    remember: false
+                  }).then(loginResponse => {
+                    if (loginResponse?.code === 200 && loginResponse?.data?.token) {
+                      // 使用登录获取的token
+                      saveUserDataAndRedirect(loginResponse.data.user, loginResponse.data.token);
+                    } else {
+                      ElMessage.error('注册成功，但自动登录失败，请手动登录');
+                      router.push('/login');
+                    }
+                  }).catch(loginError => {
+                    console.error('自动登录失败:', loginError);
+                    ElMessage.error('注册成功，但自动登录失败，请手动登录');
+                    router.push('/login');
+                  });
+                }
               } else {
                 ElMessage.error('注册返回数据不完整');
               }
             } else {
-              ElMessage.error(response?.message || '注册失败');
+              // 检查是否为账号已存在错误
+              const message = response?.message || response?.msg || '注册失败';
+              
+              if (response?.code === 409 || message.includes('已存在') || message.includes('exist') || message.includes('duplicate')) {
+                ElMessage.error('账号已存在');
+              } else if (response?.code === 400 || message.includes('格式') || message.includes('format')) {
+                ElMessage.error('账号格式错误，请检查邮箱或手机号格式');
+              } else if (response?.code === 422 || message.includes('密码') || message.includes('password')) {
+                ElMessage.error('密码强度不足，请确保密码至少6位');
+              } else if (response?.code === 401) {
+                ElMessage.error('未授权，请稍后再试');
+              } else if (response?.code === 403) {
+                ElMessage.error('禁止访问，请联系管理员');
+              } else {
+                // 尝试从错误信息中提取更具体的错误原因
+                if (message.includes('username') || message.includes('account')) {
+                  ElMessage.error('账号格式错误，请检查输入');
+                } else if (message.includes('nickname')) {
+                  ElMessage.error('昵称格式错误，请检查输入');
+                } else if (message.includes('email')) {
+                  ElMessage.error('邮箱格式错误，请检查邮箱地址');
+                } else if (message.includes('phone')) {
+                  ElMessage.error('手机号格式错误，请检查手机号码');
+                } else {
+                  ElMessage.error(message || '注册失败，请稍后再试');
+                }
+              }
             }
           }).catch(error => {
             console.error('注册失败:', error);
-            ElMessage.error('注册失败: ' + (error.response?.data?.message || error.message));
+            // 更详细的错误处理，根据不同的错误类型显示不同的提示
+            if (error.response) {
+              // 服务器响应了错误状态
+              const status = error.response.status;
+              const message = error.response.data?.message || error.response.data?.msg || '注册失败';
+              
+              if (status === 409 || message.includes('已存在') || message.includes('exist') || message.includes('duplicate')) {
+                ElMessage.error('账号已存在');
+              } else if (status === 400 || message.includes('格式') || message.includes('format')) {
+                ElMessage.error('账号格式错误，请检查邮箱或手机号格式');
+              } else if (status === 422 || message.includes('密码') || message.includes('password')) {
+                ElMessage.error('密码强度不足，请确保密码至少6位');
+              } else if (status === 401) {
+                ElMessage.error('未授权，请稍后再试');
+              } else if (status === 403) {
+                ElMessage.error('禁止访问，请联系管理员');
+              } else {
+                // 尝试从错误信息中提取更具体的错误原因
+                if (message.includes('username') || message.includes('account')) {
+                  ElMessage.error('账号格式错误，请检查输入');
+                } else if (message.includes('nickname')) {
+                  ElMessage.error('昵称格式错误，请检查输入');
+                } else if (message.includes('email')) {
+                  ElMessage.error('邮箱格式错误，请检查邮箱地址');
+                } else if (message.includes('phone')) {
+                  ElMessage.error('手机号格式错误，请检查手机号码');
+                } else {
+                  ElMessage.error(message || '注册失败，请稍后再试');
+                }
+              }
+            } else if (error.request) {
+              // 请求已发出但没有收到响应
+              ElMessage.error('网络连接失败，请检查网络后重试');
+            } else {
+              // 其他错误
+              ElMessage.error('发生未知错误，请稍后再试');
+            }
           });
         } else {
           ElMessage.error('API服务不可用');
@@ -317,11 +487,6 @@ const handleRegister = async () => {
       }
     }
   })
-}
-
-// 第三方登录
-const handleSocialLogin = (type) => {
-  ElMessage.info(`${type === 'wechat' ? '微信' : type === 'qq' ? 'QQ' : '微博'}登录功能开发中...`)
 }
 
 // 发送验证码
@@ -466,77 +631,6 @@ const handleResetPassword = () => {
   box-shadow: 0 8px 20px rgba(25, 118, 210, 0.3);
 }
 
-.third-party-login {
-  margin-top: 30px;
-}
-
-.divider {
-  text-align: center;
-  margin: 20px 0;
-  position: relative;
-}
-
-.divider::before,
-.divider::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  width: 35%;
-  height: 1px;
-  background: #e0e0e0;
-}
-
-.divider::before {
-  left: 0;
-}
-
-.divider::after {
-  right: 0;
-}
-
-.divider span {
-  color: #999;
-  font-size: 12px;
-  background: white;
-  padding: 0 10px;
-  position: relative;
-}
-
-.social-login {
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-}
-
-.social-btn {
-  width: 50px;
-  height: 50px;
-  font-size: 24px;
-}
-
-.social-btn.wechat {
-  background: #07c160;
-  color: white;
-  border-color: #07c160;
-}
-
-.social-btn.qq {
-  background: #12b7f5;
-  color: white;
-  border-color: #12b7f5;
-}
-
-.social-btn.weibo {
-  background: #e6162d;
-  color: white;
-  border-color: #e6162d;
-}
-
-.social-btn:hover {
-  opacity: 0.8;
-  transform: translateY(-3px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
 
 /* 优化输入框样式 */
 :deep(.el-input__wrapper) {
