@@ -52,11 +52,12 @@
         <el-input
           v-model="form.content"
           type="textarea"
-          :rows="8"
-          placeholder="写下你想对未来的自己说的话..."
-          maxlength="2000"
+          :rows="10"
+          placeholder="请输入时间胶囊的内容..."
+          maxlength="10000"
           show-word-limit
         />
+        <p class="form-tip">支持输入文字内容，记录您的想法和感受</p>
       </el-form-item>
 
       <!-- 隐私设置 -->
@@ -316,6 +317,12 @@ export default {
   margin: 0;
   width: 100%;
   min-height: calc(100vh - 120px);
+}
+
+.editor-wrapper {
+  border: 1px solid #ccc;
+  width: 100%;
+  z-index: 100;
 }
 
 h2 {

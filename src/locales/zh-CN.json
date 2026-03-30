@@ -1,0 +1,50 @@
+{
+  "menu": {
+    "home": "首页",
+    "createCapsule": "创建胶囊",
+    "timeline": "时间轴",
+    "goals": "我的目标",
+    "achievements": "成就徽章",
+    "aiAssistant": "成长助手",
+    "userManagement": "用户管理",
+    "dashboard": "数据记录看板",
+    "capsuleManagement": "时光胶囊管理"
+  },
+  "dashboard": {
+    "title": "时间胶囊数据记录看板",
+    "stats": {
+      "dau": "日活用户 (DAU)",
+      "mau": "月活用户 (MAU)",
+      "totalUsers": "总用户数",
+      "totalCapsules": "总胶囊数量",
+      "capsulesToday": "今日新增胶囊",
+      "growthRate": "增长率"
+    },
+    "growth": {
+      "title": "用户增长趋势",
+      "newUsers": "新增用户",
+      "activeUsers": "活跃用户",
+      "export": "导出数据",
+      "today": "今日",
+      "yesterday": "昨日",
+      "last7Days": "近7天",
+      "last30Days": "近30天",
+      "custom": "自定义范围",
+      "wow": "同比",
+      "mom": "环比"
+    },
+    "capsule": {
+      "title": "胶囊数据统计",
+      "avgUnlock": "平均解锁周期",
+      "days": "天",
+      "distribution": "解锁周期分布",
+      "hotTopics": "热门主题词云"
+    }
+  },
+  "common": {
+    "loading": "加载中...",
+    "error": "数据加载失败",
+    "confirm": "确定",
+    "cancel": "取消"
+  }
+}

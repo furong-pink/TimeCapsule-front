@@ -1,0 +1,50 @@
+{
+  "menu": {
+    "home": "Home",
+    "createCapsule": "Create Capsule",
+    "timeline": "Timeline",
+    "goals": "My Goals",
+    "achievements": "Achievements",
+    "aiAssistant": "AI Assistant",
+    "userManagement": "User Management",
+    "dashboard": "Data Dashboard",
+    "capsuleManagement": "Capsule Management"
+  },
+  "dashboard": {
+    "title": "Time Capsule Data Dashboard",
+    "stats": {
+      "dau": "Daily Active Users (DAU)",
+      "mau": "Monthly Active Users (MAU)",
+      "totalUsers": "Total Users",
+      "totalCapsules": "Total Capsules",
+      "capsulesToday": "New Capsules Today",
+      "growthRate": "Growth Rate"
+    },
+    "growth": {
+      "title": "User Growth Trend",
+      "newUsers": "New Users",
+      "activeUsers": "Active Users",
+      "export": "Export Data",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "last7Days": "Last 7 Days",
+      "last30Days": "Last 30 Days",
+      "custom": "Custom Range",
+      "wow": "YoY",
+      "mom": "MoM"
+    },
+    "capsule": {
+      "title": "Capsule Statistics",
+      "avgUnlock": "Avg Unlock Period",
+      "days": "days",
+      "distribution": "Unlock Period Distribution",
+      "hotTopics": "Hot Topics Word Cloud"
+    }
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Failed to load data",
+    "confirm": "Confirm",
+    "cancel": "Cancel"
+  }
+}

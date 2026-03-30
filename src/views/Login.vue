@@ -257,7 +257,8 @@ const handleLogin = async () => {
               localStorage.setItem('user', JSON.stringify({
                 account: userData.account,
                 nickname: userData.nickname,
-                avatar: userData.avatar
+                avatar: userData.avatar,
+                role: userData.role
               }));
               
               // 保存token
@@ -267,7 +268,13 @@ const handleLogin = async () => {
               window.dispatchEvent(new CustomEvent('user-login'));
               
               ElMessage.success('登录成功');
-              router.push('/');
+              
+              // 根据角色跳转
+              if (userData.role === 'ADMIN') {
+                router.push('/admin/users');
+              } else {
+                router.push('/');
+              }
             } else {
               // 优化登录错误处理，根据不同的错误类型显示不同的提示
               const message = response?.message || response?.msg || '登录失败';
@@ -278,8 +285,8 @@ const handleLogin = async () => {
                 ElMessage.error('密码错误，请重新输入');
               } else if (message.includes('格式') || message.includes('format')) {
                 ElMessage.error('账号格式错误，请检查邮箱或手机号格式');
-              } else if (message.includes('禁用') || message.includes('disabled')) {
-                ElMessage.error('账号已被禁用，请联系管理员');
+              } else if (message.includes('禁用') || message.includes('disabled') || message.includes('状态异常')) {
+                ElMessage.error('账号状态异常，请与管理员联系');
               } else {
                 ElMessage.error(message || '登录失败，请检查账号和密码');
               }
@@ -298,8 +305,8 @@ const handleLogin = async () => {
                 ElMessage.error('登录已过期，请重新登录');
               } else if (status === 400 || message.includes('格式') || message.includes('format')) {
                 ElMessage.error('账号格式错误，请检查邮箱或手机号格式');
-              } else if (status === 403 || message.includes('禁用') || message.includes('disabled')) {
-                ElMessage.error('账号已被禁用，请联系管理员');
+              } else if (status === 403 || message.includes('禁用') || message.includes('disabled') || message.includes('状态异常')) {
+                ElMessage.error('账号状态异常，请与管理员联系');
               } else if (status === 429 || message.includes('频繁') || message.includes('rate limit')) {
                 ElMessage.error('登录尝试过于频繁，请稍后再试');
               } else {

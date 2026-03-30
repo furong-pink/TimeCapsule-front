@@ -1,182 +1,352 @@
 <!-- src/App.vue -->
 <template>
   <el-config-provider>
-    <!-- 登录页面：不显示导航栏 -->
-    <div v-if="isLoginPage" class="login-page-wrapper">
-      <router-view />
-    </div>
-    
-    <!-- 主应用页面：显示完整布局 -->
-    <el-container v-else class="app-container">
-      <!-- 顶部栏 -->
-      <el-header class="app-header">
-        <div class="header-title">时光胶囊</div>
-        <div class="header-right" v-if="isLoggedIn">
-          <el-dropdown @command="handleCommand" trigger="click" @visible-change="handleDropdownVisibleChange">
-            <span class="user-info" :class="{ 'dropdown-open': userMenuOpen }">
-              <el-avatar :size="32" :src="userInfo.avatar" style="margin-right: 8px;">
-                <el-icon><User /></el-icon>
-              </el-avatar>
-              <span class="username">{{ userInfo.nickname || '用户' }}</span>
-              <el-icon class="dropdown-icon"><ArrowDown /></el-icon>
-            </span>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item command="logout">
-                  <el-icon><SwitchButton /></el-icon>
-                  退出登录
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </div>
-      </el-header>
+    <div class="app-wrapper">
+      <!-- 登录页面：不显示导航栏 -->
+      <div v-if="isLoginPage" class="login-page-wrapper">
+        <router-view />
+      </div>
+      
+      <!-- 主应用页面：显示完整布局 -->
+      <el-container v-else class="app-container">
+        <!-- 顶部栏 -->
+        <el-header class="app-header">
+          <div class="header-title">时光胶囊</div>
+          <div class="header-right" v-if="isLoggedIn">
+            <!-- 消息通知 -->
+            <el-dropdown trigger="click" @command="handleNotificationCommand" style="margin-right: 20px;">
+              <span class="notification-icon">
+                <el-badge :value="unreadCount" :hidden="unreadCount === 0" class="item">
+                  <el-icon :size="20"><Message /></el-icon>
+                </el-badge>
+              </span>
+              <template #dropdown>
+                <el-dropdown-menu class="notification-dropdown">
+                  <div class="notification-header">
+                    <span>{{ '消息通知' }}</span>
+                    <el-button link type="primary" size="small" @click="markAllRead">{{ '全部标记为已读' }}</el-button>
+                  </div>
+                  <div v-if="notifications.length === 0" class="no-notifications">
+                    {{ '暂无消息' }}
+                  </div>
+                  <el-dropdown-item v-for="item in notifications" :key="item.id" :command="item" class="notification-item">
+                    <div class="notification-content">
+                      <div class="notification-title">
+                        <el-tag size="small" type="danger">{{ '审核拒绝' }}</el-tag>
+                        <span class="capsule-title">《{{ item.content }}》</span>
+                      </div>
+                      <div class="notification-reason">{{ item.reason }}</div>
+                      <div class="notification-time">{{ formatDate(item.createdAt) }}</div>
+                    </div>
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            
+            <el-dropdown @command="handleCommand" trigger="click" @visible-change="handleDropdownVisibleChange">
+              <span class="user-info" :class="{ 'dropdown-open': userMenuOpen }">
+                <el-avatar :size="32" :src="userInfo.avatar" style="margin-right: 8px;">
+                  <el-icon><User /></el-icon>
+                </el-avatar>
+                <span class="username">{{ userInfo.nickname || '用户' }}</span>
+                <el-icon class="dropdown-icon"><ArrowDown /></el-icon>
+              </span>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="logout">
+                    <el-icon><SwitchButton /></el-icon>
+                    退出登录
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+        </el-header>
 
-      <el-container class="main-layout">
-        <!-- 左侧导航菜单 -->
-        <el-aside class="app-aside" width="200px">
-          <el-menu
-            :default-active="$route.path"
-            router
-            background-color="#f5f7fa"
-            text-color="#333"
-            active-text-color="#409EFF"
-            :unique-opened="true"
-            class="sidebar-menu"
-          >
-            <el-menu-item index="/">
-              <el-icon><House /></el-icon>
-              <span>首页</span>
-            </el-menu-item>
-            <el-menu-item index="/capsule/create">
-              <el-icon><Edit /></el-icon>
-              <span>创建胶囊</span>
-            </el-menu-item>
-            <el-menu-item index="/timeline">
-              <el-icon><Timer /></el-icon>
-              <span>时间轴</span>
-            </el-menu-item>
-            <el-menu-item index="/goals">
-              <el-icon><Trophy /></el-icon>
-              <span>我的目标</span>
-            </el-menu-item>
-            <el-menu-item index="/achievements">
-              <el-icon><Medal /></el-icon>
-              <span>成就徽章</span>
-            </el-menu-item>
-            <el-menu-item index="/ai-assistant">
-              <el-icon><ChatLineRound /></el-icon>
-              <span>成长助手</span>
-            </el-menu-item>
-          </el-menu>
-        </el-aside>
+        <el-container class="main-layout">
+          <!-- 左侧导航菜单 -->
+          <el-aside class="app-aside" width="200px">
+            <el-menu
+              :default-active="route.path"
+              router
+              background-color="#f5f7fa"
+              text-color="#333"
+              active-text-color="#409EFF"
+              :unique-opened="true"
+              class="sidebar-menu"
+            >
+              <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/">
+                <el-icon><House /></el-icon>
+                <span>{{ '首页' }}</span>
+              </el-menu-item>
+              <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/capsule/create">
+                <el-icon><Edit /></el-icon>
+                <span>{{ '创建胶囊' }}</span>
+              </el-menu-item>
+              <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/timeline">
+                <el-icon><Timer /></el-icon>
+                <span>{{ '时间轴' }}</span>
+              </el-menu-item>
+              <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/goals">
+                <el-icon><Trophy /></el-icon>
+                <span>{{ '我的目标' }}</span>
+              </el-menu-item>
+              <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/achievements">
+                <el-icon><Medal /></el-icon>
+                <span>{{ '成就徽章' }}</span>
+              </el-menu-item>
+              <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/ai-assistant">
+                <el-icon><ChatLineRound /></el-icon>
+                <span>{{ '成长助手' }}</span>
+              </el-menu-item>
+              <el-menu-item v-if="userInfo.role === 'ADMIN'" index="/admin/users">
+                <el-icon><Setting /></el-icon>
+                <span>{{ '用户管理' }}</span>
+              </el-menu-item>
+              <el-menu-item v-if="userInfo.role === 'ADMIN'" index="/admin/dashboard">
+                <el-icon><DataLine /></el-icon>
+                <span>{{ '数据看板' }}</span>
+              </el-menu-item>
+              <el-menu-item v-if="userInfo.role === 'ADMIN'" index="/admin/capsules">
+                <el-icon><Collection /></el-icon>
+                <span>{{ '胶囊管理' }}</span>
+              </el-menu-item>
+            </el-menu>
+          </el-aside>
 
-        <!-- 主内容区域 -->
-        <el-main class="app-main">
-          <router-view :key="$route.fullPath" />
-        </el-main>
+          <!-- 主内容区域 -->
+          <el-main class="app-main">
+            <router-view :key="route.fullPath" />
+          </el-main>
+        </el-container>
       </el-container>
-    </el-container>
+
+      <!-- 全局加载遮罩：不卸载 DOM，只做视觉遮盖 -->
+      <div v-if="appLoading" class="app-loading-wrapper">
+        <div class="loading-spinner"></div>
+      </div>
+    </div>
+
+    <!-- 全局拒绝通知对话框 -->
+    <el-dialog
+      v-model="rejectionDialogVisible"
+      :title="'时光胶囊审核未通过'"
+      width="400px"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :show-close="true"
+      @close="onCloseRejectionModal"
+    >
+      <div class="rejection-dialog-content">
+        <el-result icon="error" :title="rejectionTitle" :sub-title="rejectionReason">
+          <template #extra>
+            <el-button type="primary" @click="goToCapsuleDetail">{{ '查看详情' }}</el-button>
+          </template>
+        </el-result>
+      </div>
+    </el-dialog>
   </el-config-provider>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+// import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { House, Edit, Timer, Trophy, Medal, User, ArrowDown, SwitchButton, ChatLineRound } from '@element-plus/icons-vue'
+import { House, Edit, Timer, Trophy, Medal, User, ArrowDown, SwitchButton, ChatLineRound, Setting, Menu, DataLine, Collection, Message } from '@element-plus/icons-vue'
+import wsService from '@/utils/websocket'
+import dayjs from 'dayjs'
 
 const router = useRouter()
 const route = useRoute()
+// const { t, locale } = useI18n()
 
-// 用户信息
+// --- 用户状态相关 ---
 const userInfo = ref({
+  id: null,
   nickname: '',
-  avatar: ''
+  avatar: '',
+  bio: '',
+  role: 'USER'
 })
 
-// 登录状态（响应式）
 const loggedIn = ref(false)
-
-// 用户下拉菜单是否展开
 const userMenuOpen = ref(false)
+const appLoading = ref(true) // 新增：全局加载状态
 
-// 检查是否为登录页面
 const isLoginPage = computed(() => {
-  return route.path === '/login'
+  return route && (route.path === '/login' || route.name === 'Login')
 })
 
-// 检查登录状态
 const isLoggedIn = computed(() => {
   return loggedIn.value
 })
 
-// 加载用户信息
-const loadUserInfo = async () => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    // 优先从服务器获取最新的用户信息
-    try {
-      const response = await window.$axios.get('/users/profile');
-      if (response?.code === 200 && response?.data) {
-        const userData = response.data;
-        userInfo.value = {
-          nickname: userData.nickname || '',
-          avatar: userData.avatar || '',
-          bio: userData.bio || ''
-        };
-        // 更新本地存储
-        localStorage.setItem('user', JSON.stringify({
-          nickname: userData.nickname,
-          avatar: userData.avatar,
-          bio: userData.bio
-        }));
-        loggedIn.value = true;
-      } else {
-        // 如果服务器获取失败，从本地存储加载
-        const user = localStorage.getItem('user');
-        if (user) {
-          const parsedUser = JSON.parse(user);
-          userInfo.value = parsedUser;
-          loggedIn.value = true;
-        } else {
-          loggedIn.value = false;
-        }
+// --- 消息通知相关 ---
+const notifications = ref([])
+const unreadCount = ref(0)
+const rejectionDialogVisible = ref(false)
+const currentRejection = ref(null)
+
+const rejectionTitle = computed(() => {
+  if (currentRejection.value) {
+    return `你有 ${unreadCount.value} 个胶囊被拒绝了`
+  }
+  return ''
+})
+
+const rejectionReason = computed(() => {
+  return currentRejection.value ? `最新原因: ${currentRejection.value.reason}` : ''
+})
+
+// --- 方法定义 ---
+
+// 初始化 WebSocket 连接
+const initWebSocket = () => {
+  if (isLoggedIn.value && userInfo.value?.id) {
+    wsService.connect(userInfo.value.id)
+    wsService.onMessage((data) => {
+      if (data.type === 'REJECTION') {
+        fetchUnreadCount()
+        fetchNotifications()
+        currentRejection.value = data
+        rejectionDialogVisible.value = true
       }
-    } catch (e) {
-      // 如果服务器获取失败，从本地存储加载
-      const user = localStorage.getItem('user');
-      if (user) {
-        try {
-          const parsedUser = JSON.parse(user);
-          userInfo.value = parsedUser;
-          loggedIn.value = true;
-        } catch (parseError) {
-          console.error('加载用户信息失败', parseError);
-          loggedIn.value = false;
-        }
-      } else {
-        loggedIn.value = false;
-      }
-    }
-  } else {
-    // 没有token，直接从本地存储加载
-    const user = localStorage.getItem('user');
-    if (user) {
-      try {
-        userInfo.value = JSON.parse(user);
-        loggedIn.value = true;
-      } catch (e) {
-        console.error('加载用户信息失败', e);
-        loggedIn.value = false;
-      }
-    } else {
-      loggedIn.value = false;
-    }
+    })
   }
 }
 
-// 处理下拉菜单命令
+// 获取未读消息数量
+const fetchUnreadCount = async () => {
+  if (!isLoggedIn.value || !window.$axios) return
+  try {
+    const res = await window.$axios.get('/notifications/unread/count')
+    if (res.code === 200) {
+      unreadCount.value = res.data
+    }
+  } catch (e) {
+    console.error('获取未读消息数量失败:', e)
+  }
+}
+
+// 获取消息列表
+const fetchNotifications = async () => {
+  if (!isLoggedIn.value || !window.$axios) return
+  try {
+    const res = await window.$axios.get('/notifications/unread')
+    if (res.code === 200) {
+      notifications.value = res.data
+    }
+  } catch (e) {
+    console.error('获取消息列表失败:', e)
+  }
+}
+
+// 标记所有为已读
+const markAllRead = async () => {
+  if (!window.$axios) return
+  try {
+    const res = await window.$axios.put('/notifications/read-all')
+    if (res.code === 200) {
+      unreadCount.value = 0
+      notifications.value = []
+    }
+  } catch (e) {
+    console.error('标记已读失败:', e)
+  }
+}
+
+// 处理消息点击
+const handleNotificationCommand = async (item) => {
+  if (!window.$axios) return
+  try {
+    await window.$axios.put(`/notifications/${item.id}/read`)
+    fetchUnreadCount()
+    fetchNotifications()
+    router.push(`/capsule/${item.capsuleId}`)
+  } catch (e) {
+    console.error('操作失败:', e)
+  }
+}
+
+const onCloseRejectionModal = () => {
+  rejectionDialogVisible.value = false
+}
+
+const goToCapsuleDetail = async () => {
+  if (currentRejection.value) {
+    await handleNotificationCommand(currentRejection.value)
+    rejectionDialogVisible.value = false
+  }
+}
+
+const formatDate = (date) => {
+  return dayjs(date).format('MM-DD HH:mm')
+}
+
+const loadUserInfo = async () => {
+  const token = localStorage.getItem('token')
+  
+  // 如果没有 token，直接设为未登录
+  if (!token) {
+    loggedIn.value = false
+    userInfo.value = { id: null, nickname: '', avatar: '', role: 'USER' }
+    appLoading.value = false
+    return
+  }
+
+  appLoading.value = true
+  if (window.$axios) {
+    try {
+      const response = await window.$axios.get('/users/profile')
+      if (response?.code === 200 && response?.data) {
+        const userData = response.data
+        userInfo.value = {
+          id: userData.id,
+          nickname: userData.nickname || '',
+          avatar: userData.avatar || '',
+          bio: userData.bio || '',
+          role: userData.role || 'USER'
+        }
+        localStorage.setItem('user', JSON.stringify(userInfo.value))
+        loggedIn.value = true
+      } else {
+        // API 响应异常，清除状态
+        handleLogoutLocally()
+      }
+    } catch (e) {
+      console.error('API 获取用户信息失败', e)
+      // 如果是 401 错误，拦截器会处理跳转，这里只需要确保状态正确
+      if (e.response?.status === 401) {
+        handleLogoutLocally()
+      } else {
+        // 其他错误（如网络问题），尝试使用缓存
+        const user = localStorage.getItem('user')
+        if (user) {
+          try {
+            userInfo.value = JSON.parse(user)
+            loggedIn.value = true
+          } catch (err) {
+            handleLogoutLocally()
+          }
+        } else {
+          handleLogoutLocally()
+        }
+      }
+    }
+  }
+  
+  appLoading.value = false
+}
+
+// 本地清除登录状态，不触发额外的重定向（由拦截器或路由守卫处理）
+const handleLogoutLocally = () => {
+  localStorage.removeItem('user')
+  localStorage.removeItem('token')
+  userInfo.value = { id: null, nickname: '', avatar: '', role: 'USER' }
+  loggedIn.value = false
+}
+
 const handleCommand = (command) => {
   if (command === 'logout') {
     ElMessageBox.confirm('确定要退出登录吗？', '提示', {
@@ -184,55 +354,61 @@ const handleCommand = (command) => {
       cancelButtonText: '取消',
       type: 'warning'
     }).then(() => {
-      // 清除用户信息
       localStorage.removeItem('user')
       localStorage.removeItem('token')
-      userInfo.value = { nickname: '', avatar: '' }
+      userInfo.value = { id: null, nickname: '', avatar: '', role: 'USER' }
       loggedIn.value = false
+      wsService.disconnect()
       ElMessage.success('已退出登录')
-      // 跳转到登录页
       router.push('/login')
     }).catch(() => {})
   }
 }
 
-// 处理下拉菜单显示/隐藏，控制箭头动画
 const handleDropdownVisibleChange = (visible) => {
   userMenuOpen.value = visible
 }
 
-// 监听路由变化
-watch(() => route.path, async (newPath) => {
-  if (newPath !== '/login') {
-    await loadUserInfo()
-  } else {
-    // 如果已经在登录页，清除用户信息
-    userInfo.value = { nickname: '', avatar: '' }
-    loggedIn.value = false
-  }
-}, { immediate: true })
-
-// 监听localStorage变化（用于跨页面通信）
 const handleStorageChange = async (e) => {
-  if (e.key === 'user') {
+  if (e.key === 'user' || e.key === 'token') {
     await loadUserInfo()
   }
 }
 
-// 自定义事件监听（用于同页面通信）
 const handleUserLogin = async () => {
   await loadUserInfo()
 }
 
-// 组件挂载时加载用户信息
+// --- 监听与生命周期 ---
+
+watch(isLoggedIn, (newVal) => {
+  if (newVal) {
+    initWebSocket()
+    fetchUnreadCount()
+    fetchNotifications()
+  } else {
+    wsService.disconnect()
+  }
+})
+
+watch(() => route.path, async (newPath) => {
+  if (newPath !== '/login') {
+    await loadUserInfo()
+  } else {
+    userInfo.value = { id: null, nickname: '', avatar: '', role: 'USER' }
+    loggedIn.value = false
+    appLoading.value = false // 确保登录页不显示加载中
+  }
+}, { immediate: true })
+
 onMounted(async () => {
-  await loadUserInfo()
+  // 移除 loadUserInfo()，交给 watch 处理
   window.addEventListener('storage', handleStorageChange)
   window.addEventListener('user-login', handleUserLogin)
 })
 
-// 组件卸载时移除事件监听
 onUnmounted(() => {
+  wsService.disconnect()
   window.removeEventListener('storage', handleStorageChange)
   window.removeEventListener('user-login', handleUserLogin)
 })
@@ -246,6 +422,34 @@ onUnmounted(() => {
   flex-direction: column;
   margin: 0;
   padding: 0;
+}
+
+/* 全局加载遮罩 */
+.app-loading-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #ffffff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #409eff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* 顶部栏样式 */
@@ -296,6 +500,80 @@ onUnmounted(() => {
 
 .user-info.dropdown-open .dropdown-icon {
   transform: rotate(180deg);
+}
+
+/* 消息通知相关样式 */
+.notification-icon {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  height: 40px;
+  border-radius: 4px;
+  transition: background-color 0.3s;
+}
+
+.notification-icon:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.notification-dropdown {
+  width: 300px;
+  padding: 0;
+}
+
+.notification-header {
+  padding: 10px 15px;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+}
+
+.no-notifications {
+  padding: 30px;
+  text-align: center;
+  color: #909399;
+}
+
+.notification-item {
+  padding: 12px 15px !important;
+  border-bottom: 1px solid #f9f9f9;
+}
+
+.notification-content {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.notification-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.capsule-title {
+  font-weight: bold;
+  color: #303133;
+  font-size: 14px;
+}
+
+.notification-reason {
+  font-size: 13px;
+  color: #606266;
+  white-space: normal;
+  line-height: 1.4;
+}
+
+.notification-time {
+  font-size: 12px;
+  color: #909399;
+}
+
+.rejection-dialog-content {
+  padding: 10px 0;
 }
 
 /* 登录页面包装器 */

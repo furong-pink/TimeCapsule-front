@@ -48,8 +48,7 @@
 
       <div class="content-section">
         <h3>胶囊内容</h3>
-        <div class="content-text">
-          <p>{{ capsule.content }}</p>
+        <div class="content-text rich-text-content" v-html="capsule.content">
         </div>
       </div>
 
@@ -427,8 +426,40 @@ export default {
 
 .content-text {
   line-height: 1.8;
+  color: #333;
+}
+
+/* 富文本内容样式 */
+.rich-text-content :deep(p) {
+  margin: 10px 0;
+}
+
+.rich-text-content :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+.rich-text-content :deep(ul), .rich-text-content :deep(ol) {
+  padding-left: 20px;
+  margin: 10px 0;
+}
+
+.rich-text-content :deep(blockquote) {
+  border-left: 4px solid #ccc;
+  padding-left: 10px;
+  margin: 10px 0;
   color: #666;
-  white-space: pre-wrap;
+}
+
+.rich-text-content :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.rich-text-content :deep(table td), .rich-text-content :deep(table th) {
+  border: 1px solid #ccc;
+  padding: 5px;
 }
 
 .media-grid {

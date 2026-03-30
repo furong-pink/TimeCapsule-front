@@ -10,6 +10,9 @@ import Goals from '@/views/Goals.vue'
 import Achievements from '@/views/Achievements.vue'
 import CapsuleDetail from '@/views/CapsuleDetail.vue'
 import AiAssistant from '@/views/AiAssistant.vue'
+import UserManagement from '@/views/admin/UserManagement.vue'
+import Dashboard from '@/views/admin/Dashboard.vue'
+import CapsuleManagement from '@/views/admin/CapsuleManagement.vue'
 
 // 路由配置
 const routes = [
@@ -56,6 +59,24 @@ const routes = [
     meta: { title: '成长助手' }
   },
   {
+    path: '/admin/users',
+    name: 'UserManagement',
+    component: UserManagement,
+    meta: { title: '用户管理', role: 'ADMIN' }
+  },
+  {
+    path: '/admin/dashboard',
+    name: 'Dashboard',
+    component: Dashboard,
+    meta: { title: '数据看板', role: 'ADMIN' }
+  },
+  {
+    path: '/admin/capsules',
+    name: 'CapsuleManagement',
+    component: CapsuleManagement,
+    meta: { title: '胶囊管理', role: 'ADMIN' }
+  },
+  {
     path: '/capsule/:id',
     name: 'CapsuleDetail',
     component: CapsuleDetail,
@@ -70,19 +91,46 @@ const router = createRouter({
   routes
 })
 
-// 路由守卫：检查登录状态
+// 路由守卫：检查登录状态和权限
 router.beforeEach((to, from, next) => {
-  const user = localStorage.getItem('user')
+  const token = localStorage.getItem('token')
+  let user = null
+  try {
+    const userStr = localStorage.getItem('user')
+    user = userStr ? JSON.parse(userStr) : null
+  } catch (e) {
+    console.error('解析用户信息失败', e)
+    localStorage.removeItem('user')
+  }
+  
   const isLoginPage = to.path === '/login'
   
-  // 如果未登录且不是访问登录页，则跳转到登录页
-  if (!user && !isLoginPage) {
+  // 如果没有 token 或没有用户信息，且不是访问登录页，则跳转到登录页
+  if ((!token || !user) && !isLoginPage) {
     next('/login')
   } 
-  // 如果已登录且访问登录页，则跳转到首页
-  else if (user && isLoginPage) {
-    next('/')
+  // 如果已登录且访问登录页
+  else if (token && user && isLoginPage) {
+    // 根据角色跳转到对应的首页
+    if (user.role === 'ADMIN') {
+      next('/admin/users')
+    } else {
+      next('/')
+    }
   } 
+  // 权限控制：如果路由配置了角色要求
+  else if (token && user && to.meta.role) {
+    if (user.role === to.meta.role) {
+      next()
+    } else {
+      // 角色不匹配，跳转到对应的合法首页
+      if (user.role === 'ADMIN') {
+        next('/admin/users')
+      } else {
+        next('/')
+      }
+    }
+  }
   // 其他情况正常访问
   else {
     next()

@@ -37,20 +37,25 @@ api.interceptors.response.use(
   error => {
     // 处理错误响应
     if (error.response?.status === 401) {
-      // Token过期，显示提示并跳转到登录页
+      // Token过期，清除状态
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       
-      // 显示确认对话框，只提供确定选项
-      ElMessageBox.alert('登录已过期，请重新登录', '提示', {
-        confirmButtonText: '确定',
-        callback: () => {
+      // 避免重复显示弹窗和刷新
+      if (!window.is401Handling) {
+        window.is401Handling = true;
+        ElMessageBox.alert('登录已过期，请重新登录', '提示', {
+          confirmButtonText: '确定',
+          callback: () => {
+            window.is401Handling = false;
+            // 使用重定向到登录页，而不是 location.href，避免全页面刷新
+            window.location.href = '/login';
+          }
+        }).catch(() => {
+          window.is401Handling = false;
           window.location.href = '/login';
-        }
-      }).catch(() => {
-        // 捕获取消操作，但仍跳转到登录页
-        window.location.href = '/login';
-      });
+        });
+      }
     }
     return Promise.reject(error);
   }
