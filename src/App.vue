@@ -64,6 +64,10 @@
               <el-icon><Medal /></el-icon>
               <span>成就徽章</span>
             </el-menu-item>
+            <el-menu-item index="/ai-assistant">
+              <el-icon><ChatLineRound /></el-icon>
+              <span>成长助手</span>
+            </el-menu-item>
           </el-menu>
         </el-aside>
 
@@ -80,7 +84,7 @@
 import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { House, Edit, Timer, Trophy, Medal, User, ArrowDown, SwitchButton } from '@element-plus/icons-vue'
+import { House, Edit, Timer, Trophy, Medal, User, ArrowDown, SwitchButton, ChatLineRound } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()

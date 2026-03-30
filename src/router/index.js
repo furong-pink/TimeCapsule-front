@@ -1,5 +1,5 @@
 // src/router/index.js
-import { createRouter, createWebHistory } from 'vue-router'  // 修改：将createWebHashHistory改为createWebHistory
+import { createRouter, createWebHistory } from 'vue-router'
 
 // 导入视图组件
 import Login from '@/views/Login.vue'
@@ -9,6 +9,7 @@ import Timeline from '@/views/Timeline.vue'
 import Goals from '@/views/Goals.vue'
 import Achievements from '@/views/Achievements.vue'
 import CapsuleDetail from '@/views/CapsuleDetail.vue'
+import AiAssistant from '@/views/AiAssistant.vue'
 
 // 路由配置
 const routes = [
@@ -49,6 +50,12 @@ const routes = [
     meta: { title: '成就徽章' }
   },
   {
+    path: '/ai-assistant',
+    name: 'AiAssistant',
+    component: AiAssistant,
+    meta: { title: '成长助手' }
+  },
+  {
     path: '/capsule/:id',
     name: 'CapsuleDetail',
     component: CapsuleDetail,
@@ -59,7 +66,7 @@ const routes = [
 
 // 创建路由器实例
 const router = createRouter({
-  history: createWebHistory(), // 修改：将createWebHashHistory()改为createWebHistory()
+  history: createWebHistory(),
   routes
 })
 

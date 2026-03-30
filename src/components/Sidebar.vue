@@ -17,6 +17,10 @@
         <template slot="title"><i class="el-icon-medal"></i>成就徽章</template>
         <el-menu-item index="3-1" @click="$router.push({name: 'Achievements'})">查看成就</el-menu-item>
       </el-submenu>
+      <el-submenu index="4">
+        <template slot="title"><i class="el-icon-chat-line-round"></i>成长助手</template>
+        <el-menu-item index="4-1" @click="$router.push({name: 'AiAssistant'})">AI 对话</el-menu-item>
+      </el-submenu>
     </el-menu>
   </el-aside>
 </template>
