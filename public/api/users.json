@@ -1,0 +1,66 @@
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "list": [
+      {
+        "id": 1,
+        "account": "admin",
+        "nickname": "管理员",
+        "email": "admin@example.com",
+        "phone": "13800138000",
+        "avatar": "",
+        "status": 1,
+        "createdAt": "2024-01-01T00:00:00",
+        "lastLoginAt": "2024-01-01T00:00:00"
+      },
+      {
+        "id": 2,
+        "account": "user1",
+        "nickname": "用户1",
+        "email": "user1@example.com",
+        "phone": "13800138001",
+        "avatar": "",
+        "status": 1,
+        "createdAt": "2024-01-02T00:00:00",
+        "lastLoginAt": "2024-01-02T00:00:00"
+      },
+      {
+        "id": 3,
+        "account": "user2",
+        "nickname": "用户2",
+        "email": "user2@example.com",
+        "phone": "13800138002",
+        "avatar": "",
+        "status": 0,
+        "createdAt": "2024-01-03T00:00:00",
+        "lastLoginAt": "2024-01-03T00:00:00"
+      },
+      {
+        "id": 4,
+        "account": "user3",
+        "nickname": "用户3",
+        "email": "user3@example.com",
+        "phone": "13800138003",
+        "avatar": "",
+        "status": 1,
+        "createdAt": "2024-01-04T00:00:00",
+        "lastLoginAt": "2024-01-04T00:00:00"
+      },
+      {
+        "id": 5,
+        "account": "user4",
+        "nickname": "用户4",
+        "email": "user4@example.com",
+        "phone": "13800138004",
+        "avatar": "",
+        "status": 1,
+        "createdAt": "2024-01-05T00:00:00",
+        "lastLoginAt": "2024-01-05T00:00:00"
+      }
+    ],
+    "total": 5,
+    "pageNum": 1,
+    "pageSize": 10
+  }
+}

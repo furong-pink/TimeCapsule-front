@@ -56,6 +56,29 @@ api.interceptors.response.use(
           window.location.href = '/login';
         });
       }
+    } else if (error.response?.status === 403) {
+      // 账号被禁用，清除状态
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      
+      // 避免重复显示弹窗和刷新
+      if (!window.is403Handling) {
+        window.is403Handling = true;
+        ElMessageBox.alert('当前账号状态异常，请重新登录', '提示', {
+          confirmButtonText: '去登录',
+          closeOnClickModal: false,
+          closeOnPressEscape: false,
+          showClose: false,
+          callback: () => {
+            window.is403Handling = false;
+            // 使用重定向到登录页，而不是 location.href，避免全页面刷新
+            window.location.href = '/login';
+          }
+        }).catch(() => {
+          window.is403Handling = false;
+          window.location.href = '/login';
+        });
+      }
     }
     return Promise.reject(error);
   }

@@ -286,7 +286,7 @@ const handleLogin = async () => {
               } else if (message.includes('格式') || message.includes('format')) {
                 ElMessage.error('账号格式错误，请检查邮箱或手机号格式');
               } else if (message.includes('禁用') || message.includes('disabled') || message.includes('状态异常')) {
-                ElMessage.error('账号状态异常，请与管理员联系');
+                ElMessage.error('账号已被禁用');
               } else {
                 ElMessage.error(message || '登录失败，请检查账号和密码');
               }
@@ -306,7 +306,7 @@ const handleLogin = async () => {
               } else if (status === 400 || message.includes('格式') || message.includes('format')) {
                 ElMessage.error('账号格式错误，请检查邮箱或手机号格式');
               } else if (status === 403 || message.includes('禁用') || message.includes('disabled') || message.includes('状态异常')) {
-                ElMessage.error('账号状态异常，请与管理员联系');
+                ElMessage.error('账号已被禁用');
               } else if (status === 429 || message.includes('频繁') || message.includes('rate limit')) {
                 ElMessage.error('登录尝试过于频繁，请稍后再试');
               } else {

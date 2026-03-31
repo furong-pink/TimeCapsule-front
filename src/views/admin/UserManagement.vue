@@ -58,8 +58,8 @@
         </el-table-column>
         <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.status === 1 ? 'success' : 'danger'">
-              {{ row.status === 1 ? '正常' : '禁用' }}
+            <el-tag :type="row.status ? 'success' : 'danger'">
+              {{ row.status ? '正常' : '禁用' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -76,7 +76,7 @@
         <el-table-column label="操作" width="150" align="center" fixed="right">
           <template #default="{ row }">
             <el-button
-              v-if="row.status === 1"
+              v-if="row.status"
               type="danger"
               size="small"
               @click="handleDisable(row)"
@@ -114,7 +114,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, User } from '@element-plus/icons-vue'
-import axios from 'axios'
+import api from '@/api/index.js'
 
 // 查询表单
 const queryForm = reactive({
@@ -151,21 +151,18 @@ const formatDateTime = (datetime: string) => {
 const loadUsers = async () => {
   loading.value = true
   try {
-    const token = localStorage.getItem('token')
-    const response = await axios.get('/api/admin/users', {
+    const response = await api.get('/admin/users', {
       params: {
         pageNum: pagination.pageNum,
         pageSize: pagination.pageSize,
-        ...queryForm
-      },
-      headers: {
-        Authorization: `Bearer ${token}`
+        account: queryForm.account,
+        status: queryForm.status
       }
     })
 
-    if (response.data && response.data.data) {
-      userList.value = response.data.data.list || []
-      pagination.total = response.data.data.total || 0
+    if (response && response.data) {
+      userList.value = response.data.list || []
+      pagination.total = response.data.total || 0
     }
   } catch (error: any) {
     console.error('加载用户列表失败:', error)
@@ -207,12 +204,12 @@ const handleDisable = (row: any) => {
     }
   ).then(async () => {
     try {
-      const token = localStorage.getItem('token')
-      await axios.put(`/api/admin/users/${row.id}/disable`, {}, {
-        headers: {
-          Authorization: `Bearer ${token}`
+      const response = await api.put(`/admin/users/${row.id}/status`, {}, {
+        params: {
+          status: 0 // 0为禁用
         }
       })
+      console.log('禁用用户响应:', response)
       ElMessage.success('用户已禁用')
       loadUsers()
     } catch (error: any) {
@@ -234,12 +231,12 @@ const handleEnable = (row: any) => {
     }
   ).then(async () => {
     try {
-      const token = localStorage.getItem('token')
-      await axios.put(`/api/admin/users/${row.id}/enable`, {}, {
-        headers: {
-          Authorization: `Bearer ${token}`
+      const response = await api.put(`/admin/users/${row.id}/status`, {}, {
+        params: {
+          status: 1 // 1为正常
         }
       })
+      console.log('启用用户响应:', response)
       ElMessage.success('用户已启用')
       loadUsers()
     } catch (error: any) {
