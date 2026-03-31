@@ -16,7 +16,7 @@
             <!-- 消息通知 -->
             <el-dropdown trigger="click" @command="handleNotificationCommand" style="margin-right: 20px;">
               <span class="notification-icon">
-                <el-badge :value="unreadCount" :hidden="unreadCount === 0" class="item">
+                <el-badge :value="unreadCount > 0 ? 1 : 0" :hidden="unreadCount === 0" class="item" :is-dot="true">
                   <el-icon :size="20"><Message /></el-icon>
                 </el-badge>
               </span>
@@ -29,16 +29,22 @@
                   <div v-if="notifications.length === 0" class="no-notifications">
                     {{ '暂无消息' }}
                   </div>
-                  <el-dropdown-item v-for="item in notifications" :key="item.id" :command="item" class="notification-item">
-                    <div class="notification-content">
-                      <div class="notification-title">
-                        <el-tag size="small" type="danger">{{ '审核拒绝' }}</el-tag>
-                        <span class="capsule-title">《{{ item.content }}》</span>
+                  <div class="notification-list">
+                    <el-dropdown-item v-for="item in notifications" :key="item.id" :command="item" class="notification-item">
+                      <div class="notification-content">
+                        <div class="notification-header-row">
+                          <el-tag size="small" :type="item.type === 'APPROVAL' ? 'success' : 'danger'" class="notification-tag">
+                            {{ item.type === 'APPROVAL' ? '审核通过' : '审核拒绝' }}
+                          </el-tag>
+                          <span class="capsule-title" :title="'您的胶囊《' + item.content + '》'">您的胶囊《{{ item.content.length > 12 ? item.content.substring(0, 12) + '...' : item.content }}》</span>
+                        </div>
+                        <div class="notification-body">
+                          {{ item.type === 'APPROVAL' ? '恭喜您，您的胶囊审核通过' : '拒绝理由：' + item.reason }}
+                        </div>
+                        <div class="notification-time">{{ formatDate(item.createdAt) }}</div>
                       </div>
-                      <div class="notification-reason">{{ item.reason }}</div>
-                      <div class="notification-time">{{ formatDate(item.createdAt) }}</div>
-                    </div>
-                  </el-dropdown-item>
+                    </el-dropdown-item>
+                  </div>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
@@ -204,13 +210,17 @@ const rejectionReason = computed(() => {
 // 初始化 WebSocket 连接
 const initWebSocket = () => {
   if (isLoggedIn.value && userInfo.value?.id) {
+    console.log('初始化 WebSocket 连接，用户ID:', userInfo.value.id)
     wsService.connect(userInfo.value.id)
     wsService.onMessage((data) => {
-      if (data.type === 'REJECTION') {
-        fetchUnreadCount()
+      console.log('收到 WebSocket 消息:', data)
+      if (data.type === 'REJECTION' || data.type === 'APPROVAL') {
+        // 只调用fetchNotifications，因为它会同时更新计数和列表
         fetchNotifications()
-        currentRejection.value = data
-        rejectionDialogVisible.value = true
+        if (data.type === 'REJECTION') {
+          currentRejection.value = data
+          rejectionDialogVisible.value = true
+        }
       }
     })
   }
@@ -232,13 +242,37 @@ const fetchUnreadCount = async () => {
 // 获取消息列表
 const fetchNotifications = async () => {
   if (!isLoggedIn.value || !window.$axios) return
+  console.log('开始获取通知列表')
   try {
-    const res = await window.$axios.get('/notifications/unread')
+    // 先尝试获取所有通知（最多5条）
+    const res = await window.$axios.get('/notifications')
+    console.log('获取所有通知响应:', res)
     if (res.code === 200) {
-      notifications.value = res.data
+      // 后端返回的是直接的通知列表，不是分页格式
+      notifications.value = res.data.slice(0, 5) // 限制最多5条
+      console.log('通知列表:', notifications.value)
+      // 同时获取未读计数以保持一致
+      const countRes = await window.$axios.get('/notifications/unread/count')
+      console.log('获取未读计数响应:', countRes)
+      if (countRes.code === 200) {
+        unreadCount.value = countRes.data
+        console.log('未读计数:', unreadCount.value)
+      }
     }
   } catch (e) {
     console.error('获取消息列表失败:', e)
+    // 尝试获取未读通知
+    try {
+      const res = await window.$axios.get('/notifications/unread')
+      console.log('获取未读通知响应:', res)
+      if (res.code === 200) {
+        notifications.value = res.data
+        unreadCount.value = res.data.length
+        console.log('未读通知列表:', notifications.value)
+      }
+    } catch (e) {
+      console.error('获取未读消息失败:', e)
+    }
   }
 }
 
@@ -384,7 +418,7 @@ const handleUserLogin = async () => {
 watch(isLoggedIn, (newVal) => {
   if (newVal) {
     initWebSocket()
-    fetchUnreadCount()
+    // 只调用fetchNotifications，因为它会同时更新计数和列表
     fetchNotifications()
   } else {
     wsService.disconnect()
@@ -518,7 +552,7 @@ onUnmounted(() => {
 }
 
 .notification-dropdown {
-  width: 300px;
+  width: 350px;
   padding: 0;
 }
 
@@ -529,6 +563,11 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   font-weight: bold;
+}
+
+.notification-list {
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .no-notifications {
@@ -548,28 +587,39 @@ onUnmounted(() => {
   gap: 5px;
 }
 
-.notification-title {
+.notification-header-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  margin-bottom: 5px;
 }
 
 .capsule-title {
   font-weight: bold;
   color: #303133;
   font-size: 14px;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.notification-reason {
+.notification-tag {
+  flex-shrink: 0;
+}
+
+.notification-body {
   font-size: 13px;
   color: #606266;
   white-space: normal;
   line-height: 1.4;
+  margin-top: 2px;
 }
 
 .notification-time {
   font-size: 12px;
   color: #909399;
+  margin-top: 2px;
 }
 
 .rejection-dialog-content {

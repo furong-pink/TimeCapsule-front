@@ -71,7 +71,7 @@
               </div>
               <div class="card-info">
                 <div class="card-header">
-                  <h4>{{ activity.title }}</h4>
+                  <h4>{{ activity.title.length > 12 ? activity.title.substring(0, 12) + '...' : activity.title }}</h4>
                   <el-tag 
                     :type="(activity.privacy || '').toLowerCase() === 'public' ? 'success' : 'info'" 
                     size="small"

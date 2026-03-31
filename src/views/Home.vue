@@ -147,7 +147,7 @@
           </div>
         </div>
         <div class="capsule-content">
-          <h4 class="capsule-title">{{ capsule.title }}</h4>
+          <h4 class="capsule-title">{{ capsule.title.length > 12 ? capsule.title.substring(0, 12) + '...' : capsule.title }}</h4>
           <p class="capsule-date">{{ formatDate(capsule.date) }}</p>
           <p class="capsule-preview">{{ capsule.preview || capsule.content?.substring(0, 50) + '...' }}</p>
         </div>

@@ -15,7 +15,7 @@
         <el-input 
           v-model="form.title"
           placeholder="给你的时间胶囊起个名字"
-          maxlength="50"
+          maxlength="12"
           show-word-limit
         />
       </el-form-item>
@@ -133,7 +133,7 @@ export default {
     const rules = {
       title: [
         { required: true, message: '请输入标题', trigger: 'blur' },
-        { min: 2, max: 50, message: '标题长度在 2 到 50 个字符', trigger: 'blur' }
+        { min: 2, max: 12, message: '标题长度在 2 到 12 个字符', trigger: 'blur' }
       ],
       openDate: [
         { required: true, message: '请选择开启时间', trigger: 'change' }
