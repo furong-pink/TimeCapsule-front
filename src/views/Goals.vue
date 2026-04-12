@@ -388,8 +388,24 @@ export default {
 
     const formatDate = (date) => {
       if (!date) return ''
-      const d = new Date(date)
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      // 处理可能的日期格式，避免时区问题
+      let year, month, day;
+      if (typeof date === 'string' && date.includes('-') && date.length === 10) {
+        // 如果是yyyy-MM-dd格式的日期字符串，直接提取年月日
+        const parts = date.split('-');
+        year = parseInt(parts[0]);
+        month = parseInt(parts[1]);
+        day = parseInt(parts[2]);
+      } else {
+        // 其他格式，使用日期对象
+        const d = new Date(date);
+        // 使用本地时间方法确保日期与用户本地时区一致
+        year = d.getFullYear();
+        month = d.getMonth() + 1;
+        day = d.getDate();
+      }
+      // 确保日期格式正确
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
     }
 
     const handleCommand = ({ action, goal }) => {
@@ -399,7 +415,7 @@ export default {
           title: goal.title,
           description: goal.description,
           type: goal.type,
-          targetDate: goal.targetDate,
+          targetDate: goal.targetDate ? new Date(goal.targetDate) : null,
           progress: goal.progress,
           enableReminder: goal.enableReminder
         })
@@ -471,7 +487,7 @@ export default {
                   title: goalForm.title,
                   description: goalForm.description,
                   type: goalForm.type === 'long-term' ? 'LONG_TERM' : 'SHORT_TERM',
-                  targetDate: goalForm.targetDate,
+                  targetDate: goalForm.targetDate ? new Date(new Date(goalForm.targetDate).setHours(12, 0, 0, 0)).toISOString().split('T')[0] : null,
                   progress: goalForm.progress,
                   enableReminder: goalForm.enableReminder
                 };
@@ -498,7 +514,7 @@ export default {
                   if (isSuccess) {
                     // 更新本地数据
                     const updatedGoal = apiResponse?.data;
-                    if (updatedGoal) {
+                    if (updatedGoal && editingGoal.value) {
                       // 确定状态：优先使用后端返回的状态，但如果进度达到100%且状态仍为进行中，则应为已完成
                       let status = updatedGoal.status === 'COMPLETED' || updatedGoal.status === 'completed' ? '已完成' : 
                                updatedGoal.status === 'IN_PROGRESS' || updatedGoal.status === 'in_progress' ? '进行中' : 
@@ -527,23 +543,32 @@ export default {
                     const errorMessage = apiResponse?.message || apiResponse?.msg || response?.statusText || '更新失败';
                     ElMessage.error(errorMessage);
                   }
+                  // 无论成功还是失败，都将 editingGoal.value 设置为 null
+                  editingGoal.value = null;
                 }).catch(error => {
                   console.error('更新目标失败:', error);
                   ElMessage.error('更新失败: ' + (error.response?.data?.message || error.message));
+                  // 错误时也将 editingGoal.value 设置为 null
+                  editingGoal.value = null;
                 });
               } else {
                 // 如果没有API，更新本地数据
-                Object.assign(editingGoal.value, {
-                  ...goalForm,
-                  status: goalForm.progress >= 100 ? '已完成' : '进行中'
-                });
+                if (editingGoal.value) {
+                  Object.assign(editingGoal.value, {
+                    ...goalForm,
+                    status: goalForm.progress >= 100 ? '已完成' : '进行中'
+                  });
+                }
                 ElMessage.success('目标更新成功');
+                // 本地更新成功后，将 editingGoal.value 设置为 null
+                editingGoal.value = null;
               }
             } catch (error) {
               console.error('更新目标失败:', error);
               ElMessage.error('更新失败: ' + (error.response?.data?.message || error.message));
+              // 异常时也将 editingGoal.value 设置为 null
+              editingGoal.value = null;
             }
-            editingGoal.value = null
           } else {
             // 新增
             try {
@@ -553,7 +578,7 @@ export default {
                   title: goalForm.title,
                   description: goalForm.description,
                   type: goalForm.type === 'long-term' ? 'LONG_TERM' : 'SHORT_TERM',
-                  targetDate: goalForm.targetDate,
+                  targetDate: goalForm.targetDate ? new Date(new Date(goalForm.targetDate).setHours(12, 0, 0, 0)).toISOString().split('T')[0] : null,
                   progress: goalForm.progress,
                   enableReminder: goalForm.enableReminder
                 };
@@ -610,9 +635,15 @@ export default {
                     const errorMessage = apiResponse?.message || apiResponse?.msg || response?.statusText || '添加失败';
                     ElMessage.error(errorMessage);
                   }
+                  // 无论成功还是失败，都关闭弹窗并重置表单
+                  showAddDialog.value = false;
+                  resetForm();
                 }).catch(error => {
                   console.error('添加目标失败:', error);
                   ElMessage.error('添加失败: ' + (error.response?.data?.message || error.message));
+                  // 错误时也关闭弹窗并重置表单
+                  showAddDialog.value = false;
+                  resetForm();
                 });
               } else {
                 // 如果没有API，添加到本地数据
@@ -622,14 +653,18 @@ export default {
                   status: goalForm.progress >= 100 ? '已完成' : '进行中'
                 });
                 ElMessage.success('目标添加成功');
+                // 本地添加成功后，关闭弹窗并重置表单
+                showAddDialog.value = false;
+                resetForm();
               }
             } catch (error) {
               console.error('添加目标失败:', error);
               ElMessage.error('添加失败: ' + (error.response?.data?.message || error.message));
+              // 异常时也关闭弹窗并重置表单
+              showAddDialog.value = false;
+              resetForm();
             }
           }
-          showAddDialog.value = false
-          resetForm()
         }
       })
     }

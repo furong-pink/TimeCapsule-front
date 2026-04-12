@@ -5,8 +5,8 @@
       <div class="header-content">
         <h2>{{ capsule.title }}</h2>
         <div class="capsule-meta">
-          <el-tag :type="capsule.isOpened ? 'success' : 'warning'" size="small">
-            {{ capsule.isOpened ? '已开启' : '未开启' }}
+          <el-tag :type="getCapsuleStatus().type" size="small">
+            {{ getCapsuleStatus().text }}
           </el-tag>
           <el-tag 
             :type="capsule.privacy === 'PUBLIC' ? 'success' : 'info'" 
@@ -28,14 +28,14 @@
         <h3>胶囊信息</h3>
         <el-descriptions :column="2" border>
           <el-descriptions-item label="创建时间">
-            {{ formatDate(capsule.createdAt) }}
+            {{ formatDate(capsule.createdAt || capsule.created_at || capsule.date) }}
           </el-descriptions-item>
           <el-descriptions-item label="开启时间">
-            {{ formatDate(capsule.openDate) }}
+            {{ formatDate(capsule.openDate || capsule.open_date) }}
           </el-descriptions-item>
           <el-descriptions-item label="开启状态">
-            <el-tag :type="capsule.isOpened ? 'success' : 'warning'">
-              {{ capsule.isOpened ? '已开启' : '未开启' }}
+            <el-tag :type="getCapsuleStatus().type">
+              {{ getCapsuleStatus().text }}
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="隐私设置">
@@ -83,7 +83,7 @@
       </div>
 
       <!-- 开启按钮（仅在胶囊未开启且已到达开启日期时显示） -->
-      <div class="action-section" v-if="!capsule.isOpened && isDueToOpen(capsule.openDate)">
+      <div class="action-section" v-if="!capsule.isOpened && isDueToOpen(capsule.openDate || capsule.open_date)">
         <el-button 
           type="primary" 
           size="large" 
@@ -135,18 +135,24 @@ export default {
     // 格式化日期
     const formatDate = (date) => {
       if (!date) return ''
-      let d
-      if (typeof date === 'string' && date.includes('T')) {
-        d = new Date(date)
-      } else if (typeof date === 'string' && date.includes('-') && date.length === 10) {
-        d = new Date(date + 'T00:00:00')
+      // 处理可能的日期格式，避免时区问题
+      let year, month, day;
+      if (typeof date === 'string' && date.includes('-') && date.length === 10) {
+        // 如果是yyyy-MM-dd格式的日期字符串，直接提取年月日
+        const parts = date.split('-');
+        year = parseInt(parts[0]);
+        month = parseInt(parts[1]);
+        day = parseInt(parts[2]);
       } else {
-        d = new Date(date)
+        // 其他格式，使用日期对象
+        const d = new Date(date);
+        // 使用本地时间方法确保日期与用户本地时区一致
+        year = d.getFullYear();
+        month = d.getMonth() + 1;
+        day = d.getDate();
       }
-      const year = d.getFullYear()
-      const month = String(d.getMonth() + 1).padStart(2, '0')
-      const day = String(d.getDate()).padStart(2, '0')
-      return `${year}-${month}-${day}`
+      // 确保日期格式正确
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
     }
 
     // 检查是否到达开启日期
@@ -157,6 +163,26 @@ export default {
       // 设置今天的时间为00:00:00，以便比较日期部分
       today.setHours(0, 0, 0, 0)
       return openDateObj <= today
+    }
+
+    // 计算胶囊状态
+    const getCapsuleStatus = () => {
+      if (capsule.value.isOpened) {
+        return {
+          type: 'success',
+          text: '已开启'
+        }
+      } else if (isDueToOpen(capsule.value.openDate || capsule.value.open_date)) {
+        return {
+          type: 'success',
+          text: '已可开启'
+        }
+      } else {
+        return {
+          type: 'warning',
+          text: '未开启'
+        }
+      }
     }
 
     // 检查是否为图片
@@ -262,7 +288,11 @@ export default {
       loading.value = true
       try {
         if (window.$axios) {
-          const response = await window.$axios.get(`/capsules/${id}`)
+          // 确保 ID 格式正确
+          const capsuleId = typeof id === 'string' ? id.trim() : id
+          console.log('加载胶囊详情，ID:', capsuleId)
+          
+          const response = await window.$axios.get(`/capsules/${capsuleId}`)
           console.log('时间胶囊详情API响应:', response); // 调试日志
           if (response?.code === 200) {
             capsule.value = response.data
@@ -271,7 +301,7 @@ export default {
             // 检查是否需要单独获取媒体文件
             if (!capsule.value.mediaFiles || !Array.isArray(capsule.value.mediaFiles) || capsule.value.mediaFiles.length === 0) {
               console.log('媒体文件为空或不是数组，尝试单独加载');
-              await loadMediaFiles(id);
+              await loadMediaFiles(capsuleId);
             } else {
               // 确保媒体文件数组中的每个元素都是有效的对象
               const validMediaFiles = capsule.value.mediaFiles.filter(media => media && typeof media === 'object');
@@ -280,12 +310,12 @@ export default {
             }
           } else {
             ElMessage.error(response?.message || '获取时间胶囊详情失败')
-            router.push('/timeline')
+            // 不跳转到时间轴页面，保持在当前页面
           }
         } else {
           // 没有API时的后备处理
           ElMessage.error('API不可用')
-          router.push('/timeline')
+          // 不跳转到时间轴页面，保持在当前页面
         }
       } catch (error) {
         console.error('获取时间胶囊详情失败:', error)
@@ -293,10 +323,14 @@ export default {
         if (error?.response?.status === 500 && error?.response?.data?.message?.includes('nesting depth')) {
           ElMessage.error('服务器返回数据格式错误，请联系管理员')
           console.error('检测到JSON序列化循环引用错误，后端需要修复关联查询')
+        } else if (error?.response?.status === 404) {
+          ElMessage.error('时间胶囊不存在或已被删除')
+        } else if (error?.response?.status === 403) {
+          ElMessage.error('无权限访问此时间胶囊')
         } else {
           ElMessage.error('获取时间胶囊详情失败')
         }
-        router.push('/timeline')
+        // 不跳转到时间轴页面，保持在当前页面
       } finally {
         loading.value = false
       }
@@ -310,11 +344,33 @@ export default {
       opening.value = true
       try {
         if (window.$axios) {
-          const response = await window.$axios.post(`/capsules/${id}/open`)
-          if (response?.code === 200) {
+          // 确保 ID 格式正确
+          const capsuleId = typeof id === 'string' ? id.trim() : id
+          console.log('开启胶囊，ID:', capsuleId)
+          console.log('调用API:', `/capsules/${capsuleId}/open`)
+          
+          const response = await window.$axios.post(`/capsules/${capsuleId}/open`)
+          console.log('开启胶囊API响应完整信息:', response)
+          console.log('响应状态码:', response?.status)
+          console.log('响应数据:', response?.data)
+          console.log('响应code:', response?.code)
+          console.log('响应message:', response?.message)
+          
+          // 检查响应格式，支持多种格式
+          const isSuccess = response?.code === 200 || response?.status === 200 || response?.data?.code === 200
+          const message = response?.message || response?.data?.message || '开启成功'
+          
+          if (isSuccess) {
             ElMessage.success('时间胶囊开启成功！')
-            // 重新加载详情
-            await loadCapsule()
+            // 直接更新胶囊状态为已开启
+            capsule.value.isOpened = true
+            // 重新加载详情，但不跳转到时间轴页面
+            try {
+              await loadCapsule()
+            } catch (loadError) {
+              console.error('重新加载胶囊详情失败:', loadError)
+              // 不跳转到时间轴页面，保持在当前页面
+            }
             
             // 检查并更新成就
             try {
@@ -326,14 +382,23 @@ export default {
               console.error('检查成就失败:', achievementError);
             }
           } else {
-            ElMessage.error(response?.message || '开启失败')
+            console.error('开启失败，响应信息:', response)
+            ElMessage.error(message || '开启失败')
           }
         } else {
           ElMessage.error('API不可用')
         }
       } catch (error) {
         console.error('开启时间胶囊失败:', error)
-        ElMessage.error('开启时间胶囊失败')
+        console.error('错误详情:', error?.response)
+        // 提供更详细的错误信息
+        if (error?.response?.status === 404) {
+          ElMessage.error('时间胶囊不存在或已被删除')
+        } else if (error?.response?.status === 403) {
+          ElMessage.error('无权限操作此时间胶囊')
+        } else {
+          ElMessage.error('开启时间胶囊失败')
+        }
       } finally {
         opening.value = false
       }
@@ -349,6 +414,7 @@ export default {
       opening,
       formatDate,
       isDueToOpen,
+      getCapsuleStatus,
       isImage,
       isVideo,
       previewImage,

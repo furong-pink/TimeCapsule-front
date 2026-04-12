@@ -83,15 +83,15 @@
                 <div class="card-footer">
                   <span class="card-date">
                     <el-icon><Calendar /></el-icon>
-                    创建于 {{ formatDate(activity.timestamp || activity.date) }}
+                    创建于 {{ formatDate(activity.createTime || activity.createdAt || activity.created_at || activity.date) }}
                   </span>
-                  <span class="card-open-date" v-if="activity.openDate">
+                  <span class="card-open-date" v-if="activity.openDate || activity.open_date">
                     <el-icon><Clock /></el-icon>
-                    开启于 {{ formatDate(activity.openDate) }}
+                    开启于 {{ formatDate(activity.openDate || activity.open_date) }}
                   </span>
-                  <span class="card-status" v-if="activity.isOpened !== undefined">
-                    <el-tag :type="activity.isOpened ? 'success' : 'warning'" size="small">
-                      {{ activity.isOpened ? '已开启' : '未开启' }}
+                  <span class="card-status">
+                    <el-tag :type="activity.isOpenable ? 'success' : 'warning'" size="small">
+                      {{ activity.isOpenable ? '已可开启' : '未开启' }}
                     </el-tag>
                   </span>
                 </div>
@@ -177,21 +177,23 @@ export default {
     const formatDate = (date) => {
       if (!date) return ''
       // 处理可能的日期格式，避免时区问题
-      let d;
-      if (typeof date === 'string' && date.includes('T')) {
-        // 如果是ISO格式的日期字符串，创建时区正确的日期对象
-        d = new Date(date);
-      } else if (typeof date === 'string' && date.includes('-') && date.length === 10) {
-        // 如果是yyyy-MM-dd格式的日期字符串，直接解析
-        d = new Date(date + 'T00:00:00');
+      let year, month, day;
+      if (typeof date === 'string' && date.includes('-') && date.length === 10) {
+        // 如果是yyyy-MM-dd格式的日期字符串，直接提取年月日
+        const parts = date.split('-');
+        year = parseInt(parts[0]);
+        month = parseInt(parts[1]);
+        day = parseInt(parts[2]);
       } else {
-        d = new Date(date);
+        // 其他格式，使用日期对象
+        const d = new Date(date);
+        // 使用本地时间方法确保日期与用户本地时区一致
+        year = d.getFullYear();
+        month = d.getMonth() + 1;
+        day = d.getDate();
       }
-      // 确保日期不因时区转换而改变
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`
+      // 确保日期格式正确
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
     }
 
     // 获取时间轴图标
@@ -220,12 +222,15 @@ export default {
     const viewCapsule = (activity) => {
       // 跳转到胶囊详情页
       if (activity.id) {
-        // 检查胶囊是否已开启
-        if (activity.isOpened == true) {
+        // 检查胶囊是否已可开启（基于开启时间判断）
+        if (activity.isOpenable) {
           router.push(`/capsule/${activity.id}`);
         } else {
-          // 未开启，提示未开启
-          window.$message ? window.$message.info('此时间胶囊尚未开启') : alert('此时间胶囊尚未开启');
+          // 未开启，提示开启时间
+          const openDate = activity.openDate || activity.open_date;
+          const openDateStr = openDate ? formatDate(openDate) : '未来';
+          const message = `此时间胶囊将于 ${openDateStr} 开启`;
+          window.$message ? window.$message.info(message) : alert(message);
         }
       } else {
         console.error('时间胶囊ID不存在:', activity);
@@ -245,12 +250,22 @@ export default {
               const timelineActivities = [];
               response.data.timeline.forEach(yearData => {
                 yearData.capsules.forEach(capsule => {
-                  // 确保使用创建时间作为时间戳
-                  const timestamp = capsule.createdAt || capsule.date;
+                  // 严格区分创建时间和开启时间
+                  const createTime = capsule.createdAt || capsule.created_at || capsule.date;
+                  const openTime = capsule.openDate || capsule.open_date;
+                  
+                  // 根据开启时间判断胶囊是否已可开启
+                  const now = new Date();
+                  const openDate = openTime ? new Date(openTime) : null;
+                  const isOpenable = openDate ? openDate <= now : true;
+                  
                   // 确保日期字段正确处理
                   const processedCapsule = {
                     ...capsule,
-                    timestamp: timestamp,
+                    timestamp: createTime, // 时间轴按创建时间排序显示
+                    createTime: createTime, // 创建时间
+                    openDate: openTime, // 开启时间
+                    isOpenable: isOpenable, // 是否已可开启
                     type: 'capsule'
                   };
                   timelineActivities.push(processedCapsule);

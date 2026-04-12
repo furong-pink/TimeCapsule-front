@@ -221,7 +221,7 @@ export default {
               const capsuleData = {
                 title: form.title,
                 content: form.content,
-                openDate: form.openDate ? new Date(new Date(form.openDate).setHours(0, 0, 0, 0)).toISOString().split('T')[0] : null,
+                openDate: form.openDate ? new Date(new Date(form.openDate).setHours(12, 0, 0, 0)).toISOString().split('T')[0] : null,
                 privacy: form.privacy.toUpperCase(),
                 enableReminder: form.enableReminder,
                 mediaFiles: form.mediaFiles.map(file => ({
@@ -253,8 +253,8 @@ export default {
               capsules.push({
                 id: Date.now(),
                 ...form,
-                date: new Date().toISOString().split('T')[0],
-                openDate: form.openDate ? new Date(form.openDate).toISOString().split('T')[0] : ''
+                date: new Date(new Date().setHours(12, 0, 0, 0)).toISOString().split('T')[0],
+                openDate: form.openDate ? new Date(new Date(form.openDate).setHours(12, 0, 0, 0)).toISOString().split('T')[0] : ''
               });
               localStorage.setItem('capsules', JSON.stringify(capsules));
               ElMessage.success('时间胶囊创建成功！');

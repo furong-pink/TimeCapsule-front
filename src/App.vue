@@ -11,75 +11,136 @@
       <el-container v-else class="app-container">
         <!-- 顶部栏 -->
         <el-header class="app-header">
-          <div class="header-title">时光胶囊</div>
-          <div class="header-right" v-if="isLoggedIn">
-            <!-- 消息通知 -->
-            <el-dropdown trigger="click" @command="handleNotificationCommand" style="margin-right: 20px;">
-              <span class="notification-icon">
-                <el-badge :value="unreadCount > 0 ? 1 : 0" :hidden="unreadCount === 0" class="item" :is-dot="true">
-                  <el-icon :size="20"><Message /></el-icon>
-                </el-badge>
-              </span>
-              <template #dropdown>
-                <el-dropdown-menu class="notification-dropdown">
-                  <div class="notification-header">
-                    <span>{{ '消息通知' }}</span>
-                    <el-button link type="primary" size="small" @click="markAllRead">{{ '全部标记为已读' }}</el-button>
-                  </div>
-                  <div v-if="notifications.length === 0" class="no-notifications">
-                    {{ '暂无消息' }}
-                  </div>
-                  <div class="notification-list">
-                    <el-dropdown-item v-for="item in notifications" :key="item.id" :command="item" class="notification-item">
-                      <div class="notification-content">
-                        <div class="notification-header-row">
-                          <el-tag size="small" :type="item.type === 'APPROVAL' ? 'success' : 'danger'" class="notification-tag">
-                            {{ item.type === 'APPROVAL' ? '审核通过' : '审核拒绝' }}
-                          </el-tag>
-                          <span class="capsule-title" :title="'您的胶囊《' + item.content + '》'">您的胶囊《{{ item.content.length > 12 ? item.content.substring(0, 12) + '...' : item.content }}》</span>
-                        </div>
-                        <div class="notification-body">
-                          {{ item.type === 'APPROVAL' ? '恭喜您，您的胶囊审核通过' : '拒绝理由：' + item.reason }}
-                        </div>
-                        <div class="notification-time">{{ formatDate(item.createdAt) }}</div>
-                      </div>
-                    </el-dropdown-item>
-                  </div>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
+          <div class="header-content">
+            <div class="header-left">
+              <div class="header-title">时光胶囊</div>
+              <!-- 移动端菜单按钮 -->
+              <el-button type="text" class="mobile-menu-btn" @click="mobileMenuOpen = !mobileMenuOpen" v-if="isLoggedIn">
+                <el-icon :size="20"><Menu /></el-icon>
+              </el-button>
+            </div>
             
-            <el-dropdown @command="handleCommand" trigger="click" @visible-change="handleDropdownVisibleChange">
-              <span class="user-info" :class="{ 'dropdown-open': userMenuOpen }">
-                <el-avatar :size="32" :src="userInfo.avatar" style="margin-right: 8px;">
-                  <el-icon><User /></el-icon>
-                </el-avatar>
-                <span class="username">{{ userInfo.nickname || '用户' }}</span>
-                <el-icon class="dropdown-icon"><ArrowDown /></el-icon>
-              </span>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="logout">
-                    <el-icon><SwitchButton /></el-icon>
-                    退出登录
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
+            <!-- 顶部导航菜单 -->
+            <div class="header-nav" v-if="isLoggedIn">
+              <el-menu
+                  :default-active="route.path"
+                  router
+                  mode="horizontal"
+                  background-color="transparent"
+                  text-color="rgba(255, 255, 255, 0.8)"
+                  active-text-color="#ffffff"
+                  :unique-opened="true"
+                  :collapse-transition="false"
+                  class="top-nav-menu"
+                  :ellipsis="false"
+                >
+                <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/">
+                  <el-icon><House /></el-icon>
+                  <span>{{ '首页' }}</span>
+                </el-menu-item>
+                <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/capsule/create">
+                  <el-icon><Edit /></el-icon>
+                  <span>{{ '创建胶囊' }}</span>
+                </el-menu-item>
+                <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/timeline">
+                  <el-icon><Timer /></el-icon>
+                  <span>{{ '时间轴' }}</span>
+                </el-menu-item>
+                <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/goals">
+                  <el-icon><Trophy /></el-icon>
+                  <span>{{ '我的目标' }}</span>
+                </el-menu-item>
+                <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/achievements">
+                  <el-icon><Medal /></el-icon>
+                  <span>{{ '成就徽章' }}</span>
+                </el-menu-item>
+                <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/ai-assistant">
+                  <el-icon><ChatLineRound /></el-icon>
+                  <span>{{ '成长助手' }}</span>
+                </el-menu-item>
+                <el-menu-item v-if="userInfo.role === 'ADMIN'" index="/admin/users">
+                  <el-icon><Setting /></el-icon>
+                  <span>{{ '用户管理' }}</span>
+                </el-menu-item>
+                <el-menu-item v-if="userInfo.role === 'ADMIN'" index="/admin/dashboard">
+                  <el-icon><DataLine /></el-icon>
+                  <span>{{ '数据看板' }}</span>
+                </el-menu-item>
+                <el-menu-item v-if="userInfo.role === 'ADMIN'" index="/admin/capsules">
+                  <el-icon><Collection /></el-icon>
+                  <span>{{ '胶囊管理' }}</span>
+                </el-menu-item>
+              </el-menu>
+            </div>
+            
+            <div class="header-right" v-if="isLoggedIn">
+              <!-- 消息通知 -->
+              <el-dropdown trigger="click" @command="handleNotificationCommand" style="margin-right: 20px;">
+                <span class="notification-icon">
+                  <el-badge :value="unreadCount > 0 ? 1 : 0" :hidden="unreadCount === 0" class="item" :is-dot="true">
+                    <el-icon :size="20"><Message /></el-icon>
+                  </el-badge>
+                </span>
+                <template #dropdown>
+                  <el-dropdown-menu class="notification-dropdown">
+                    <div class="notification-header">
+                      <span>{{ '消息通知' }}</span>
+                      <el-button link type="primary" size="small" @click="markAllRead">{{ '全部标记为已读' }}</el-button>
+                    </div>
+                    <div v-if="notifications.length === 0" class="no-notifications">
+                      {{ '暂无消息' }}
+                    </div>
+                    <div class="notification-list">
+                      <el-dropdown-item v-for="item in notifications" :key="item.id" :command="item" class="notification-item">
+                        <div class="notification-content">
+                          <div class="notification-header-row">
+                            <el-tag size="small" :type="item.type === 'APPROVAL' ? 'success' : 'danger'" class="notification-tag">
+                              {{ item.type === 'APPROVAL' ? '审核通过' : '审核拒绝' }}
+                            </el-tag>
+                            <span class="capsule-title" :title="'您的胶囊《' + item.content + '》'">您的胶囊《{{ item.content.length > 12 ? item.content.substring(0, 12) + '...' : item.content }}》</span>
+                          </div>
+                          <div class="notification-body">
+                            {{ item.type === 'APPROVAL' ? '恭喜您，您的胶囊审核通过' : '拒绝理由：' + item.reason }}
+                          </div>
+                          <div class="notification-time">{{ formatDate(item.createdAt) }}</div>
+                        </div>
+                      </el-dropdown-item>
+                    </div>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+              
+              <el-dropdown @command="handleCommand" trigger="click" @visible-change="handleDropdownVisibleChange">
+                <span class="user-info" :class="{ 'dropdown-open': userMenuOpen }">
+                  <el-avatar :size="32" :src="userInfo.avatar" style="margin-right: 8px;">
+                    <el-icon><User /></el-icon>
+                  </el-avatar>
+                  <span class="username">{{ userInfo.nickname || '用户' }}</span>
+                  <el-icon class="dropdown-icon"><ArrowDown /></el-icon>
+                </span>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="logout">
+                      <el-icon><SwitchButton /></el-icon>
+                      退出登录
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
           </div>
-        </el-header>
-
-        <el-container class="main-layout">
-          <!-- 左侧导航菜单 -->
-          <el-aside class="app-aside" width="200px">
+          
+          <!-- 移动端下拉菜单 -->
+          <div class="mobile-menu" v-if="isLoggedIn && mobileMenuOpen">
             <el-menu
               :default-active="route.path"
               router
-              background-color="#f5f7fa"
+              background-color="#ffffff"
               text-color="#333"
               active-text-color="#409EFF"
               :unique-opened="true"
-              class="sidebar-menu"
+              class="mobile-nav-menu"
+              @select="mobileMenuOpen = false"
             >
               <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/">
                 <el-icon><House /></el-icon>
@@ -118,13 +179,13 @@
                 <span>{{ '胶囊管理' }}</span>
               </el-menu-item>
             </el-menu>
-          </el-aside>
+          </div>
+        </el-header>
 
-          <!-- 主内容区域 -->
-          <el-main class="app-main">
-            <router-view :key="route.fullPath" />
-          </el-main>
-        </el-container>
+        <!-- 主内容区域 -->
+        <el-main class="app-main">
+          <router-view :key="route.fullPath" />
+        </el-main>
       </el-container>
 
       <!-- 全局加载遮罩：不卸载 DOM，只做视觉遮盖 -->
@@ -178,6 +239,7 @@ const userInfo = ref({
 
 const loggedIn = ref(false)
 const userMenuOpen = ref(false)
+const mobileMenuOpen = ref(false)
 const appLoading = ref(true) // 新增：全局加载状态
 
 const isLoginPage = computed(() => {
@@ -488,25 +550,210 @@ onUnmounted(() => {
 
 /* 顶部栏样式 */
 .app-header {
-  background-color: #409eff;
+  background-color: #5c8eff;
   color: white;
+  box-shadow: 0 2px 8px rgba(92, 142, 255, 0.3);
+  z-index: 100;
+  margin: 0;
+  position: relative;
+  backdrop-filter: blur(10px);
+  background-image: linear-gradient(135deg, #5c8eff 0%, #4a7bff 100%);
+}
+
+.header-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  z-index: 100;
-  margin: 0;
+  height: 60px;
 }
 
-.header-title {
-  font-size: 20px;
-  font-weight: bold;
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.header-nav {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
 }
 
 .header-right {
   display: flex;
   align-items: center;
+  gap: 15px;
+}
+
+.header-title {
+  font-size: 24px;
+  font-weight: 700;
+  white-space: nowrap;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  letter-spacing: 1px;
+}
+
+.header-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 0 20px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+}
+
+/* 顶部导航菜单 */
+.top-nav-menu {
+  border-bottom: none !important;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin: 0;
+  padding: 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+.top-nav-menu::-webkit-scrollbar {
+  display: none;
+}
+
+.top-nav-menu {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.top-nav-menu .el-menu-item {
+  color: rgba(255, 255, 255, 0.9);
+  background-color: transparent !important;
+  border-radius: 25px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0 28px;
+  height: 40px;
+  line-height: 40px;
+  margin: 0 8px;
+  font-weight: 500;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.top-nav-menu .el-menu-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+  transition: left 0.5s ease;
+}
+
+.top-nav-menu .el-menu-item:hover::before {
+  left: 100%;
+}
+
+.top-nav-menu .el-menu-item:hover {
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.top-nav-menu .el-menu-item.is-active {
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.3) !important;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.25);
+  transform: translateY(0);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.top-nav-menu .el-menu-item.is-active::before {
+  background: linear-gradient(90deg, transparent, rgba(92, 142, 255, 0.15), transparent);
+}
+
+.top-nav-menu .el-menu-item .el-icon {
+  margin-right: 10px;
+  font-size: 16px;
+  transition: transform 0.3s ease;
+}
+
+.top-nav-menu .el-menu-item:hover .el-icon {
+  transform: scale(1.15);
+}
+
+.top-nav-menu .el-menu-item.is-active .el-icon {
+  color: #5c8eff;
+  transform: scale(1.15);
+}
+
+
+
+/* 移动端菜单按钮 */
+.mobile-menu-btn {
+  color: white !important;
+  display: none;
+}
+
+/* 移动端菜单 */
+.mobile-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background-color: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 99;
+  border-radius: 0 0 8px 8px;
+  overflow: hidden;
+  animation: slideDown 0.3s ease-out;
+}
+
+.mobile-nav-menu {
+  border-right: none !important;
+  padding: 10px 0;
+}
+
+.mobile-nav-menu .el-menu-item {
+  height: 50px;
+  line-height: 50px;
+  padding: 0 30px;
+  transition: all 0.3s ease;
+}
+
+.mobile-nav-menu .el-menu-item:hover {
+  background-color: #f5f7fa !important;
+  transform: translateX(5px);
+}
+
+.mobile-nav-menu .el-menu-item.is-active {
+  color: #409eff;
+  font-weight: bold;
+  background-color: #ecf5ff !important;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .user-info {
@@ -516,6 +763,7 @@ onUnmounted(() => {
   padding: 4px 12px;
   border-radius: 4px;
   transition: background-color 0.3s;
+  height: 36px;
 }
 
 .user-info:hover {
@@ -542,7 +790,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   padding: 0 10px;
-  height: 40px;
+  height: 36px;
   border-radius: 4px;
   transition: background-color 0.3s;
 }
@@ -633,40 +881,139 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* 主布局：除去 header 后剩余空间 */
-.main-layout {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-  margin: 0;
-  padding: 0;
-}
-
-/* 侧边栏样式 */
-.app-aside {
-  background-color: #f5f7fa;
-  border-right: 1px solid #e6e6e6;
-  width: 200px;
-  flex-shrink: 0;
-  margin: 0;
-  padding: 0;
-}
-
-.sidebar-menu {
-  border-right: none;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-}
-
 /* 主内容区 */
 .app-main {
   flex: 1;
-  background-color: #ffffff;
+  background-color: #f8f9ff;
   margin: 0;
-  padding: 20px;
-  overflow-y: auto;
-  height: 100%;
+  padding: 24px;
+  min-height: calc(100vh - 60px);
+  background-image: linear-gradient(135deg, #f8f9ff 0%, #eef2ff 100%);
+}
+
+/* 内容卡片样式 */
+.content-card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  padding: 24px;
+  margin-bottom: 20px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.content-card:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+/* 页面标题样式 */
+.page-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #eef2ff;
+}
+
+/* 按钮样式优化 */
+.el-button {
+  border-radius: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.el-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(92, 142, 255, 0.3);
+}
+
+/* 标签样式优化 */
+.el-tag {
+  border-radius: 16px;
+  padding: 0 12px;
+  height: 24px;
+  line-height: 24px;
+}
+
+/* 输入框样式优化 */
+.el-input__wrapper {
+  border-radius: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.el-input__wrapper:focus-within {
+  box-shadow: 0 0 0 2px rgba(92, 142, 255, 0.2) !important;
+}
+
+/* 表格样式优化 */
+.el-table {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.el-table th {
+  background-color: #f8f9ff !important;
+  font-weight: 600;
+  color: #333;
+}
+
+.el-table tr:hover > td {
+  background-color: #f8f9ff !important;
+}
+
+/* 响应式设计 */
+@media (max-width: 1024px) {
+  .header-nav {
+    margin: 0 20px;
+  }
+  
+  .top-nav-menu {
+    gap: 5px;
+  }
+  
+  .top-nav-menu .el-menu-item {
+    padding: 0 15px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .header-nav {
+    display: none;
+  }
+  
+  .mobile-menu-btn {
+    display: block;
+  }
+  
+  .header-content {
+    padding: 0 15px;
+  }
+  
+  .header-title {
+    font-size: 18px;
+  }
+  
+  .header-left {
+    gap: 15px;
+  }
+  
+  .header-right {
+    gap: 10px;
+  }
+  
+  .notification-icon {
+    padding: 0 5px;
+  }
+  
+  .username {
+    display: none;
+  }
+  
+  .app-main {
+    padding: 15px;
+  }
 }
 </style>
 
@@ -677,6 +1024,21 @@ html, body, #app {
   margin: 0;
   padding: 0;
   width: 100%;
+  overflow: auto;
+}
+
+/* 隐藏滚动条但保留滚动功能 */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+#app::-webkit-scrollbar {
+  display: none;
+}
+
+html,
+body,
+#app {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* 确保Element Plus容器铺满全屏 */
@@ -687,15 +1049,10 @@ html, body, #app {
   width: 100%;
 }
 
-.el-aside {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-}
-
 .el-main {
   margin: 0;
   padding: 20px;
+  overflow: hidden;
 }
 
 /* 移除可能存在的最大宽度限制 */

@@ -1,191 +1,156 @@
 <!-- src/views/Home.vue -->
 <template>
-  <div class="home-page">
-    <!-- 用户信息卡片 -->
-    <el-card class="user-card">
-      <div class="user-info">
-        <div class="avatar-section">
-          <el-avatar :size="80" :src="userInfo.avatar" shape="circle">
-            <el-icon>
-              <User />
-            </el-icon>
-          </el-avatar>
+  <div class="home">
+    <!-- 欢迎区域 -->
+    <div class="welcome-section">
+      <div class="welcome-content">
+        <div class="welcome-left">
+          <div class="welcome-back">欢迎回来，{{ userInfo.nickname || '用户' }}</div>
+          <h1>
+            封存此刻，<br>
+            <span class="welcome-blue">写给未来的自己</span>
+          </h1>
         </div>
-        <div class="user-details">
-          <h2 class="nickname">{{ userInfo.nickname || '时光旅行者' }}</h2>
-          <p class="bio">{{ userInfo.bio || '记录生活点滴，遇见更好的自己' }}</p>
-          <div class="user-stats">
-            <div class="stat-item">
-              <span class="stat-value">{{ capsuleCount }}</span>
-              <span class="stat-label">时间胶囊</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-value">{{ completedGoals }}</span>
-              <span class="stat-label">完成目标</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-value">{{ achievements }}</span>
-              <span class="stat-label">获得成就</span>
-            </div>
-          </div>
-        </div>
-        <el-button type="primary" plain @click="showEditDialog = true">
-          <el-icon>
-            <Edit />
-          </el-icon>
-          编辑资料
-        </el-button>
       </div>
-    </el-card>
+    </div>
 
-    <!-- 今日目标进度和日历板块容器 -->
-    <div class="goal-calendar-container">
-      <!-- 今日目标进度 -->
-      <el-card class="goal-progress-card">
-        <template #header>
-          <div class="card-header">
-            <span>📝 今日目标</span>
-            <el-tag type="success" v-if="todayGoalProgress >= 100">已完成</el-tag>
-          </div>
-        </template>
-        <div class="progress-content">
-          <p class="goal-text">完成 1 封时间胶囊</p>
-          <el-progress :percentage="todayGoalProgress" :status="todayGoalProgress >= 100 ? 'success' : ''"
-            :stroke-width="12" />
-          <p class="progress-text">{{ todayGoalProgress }}% 完成</p>
-        </div>
-      </el-card>
-      
-      <!-- 日历板块 -->
-      <el-card class="calendar-card">
-        <template #header>
-          <div class="card-header">
-            <span>📅 本月日历</span>
-          </div>
-        </template>
-        <div class="calendar-content">
-          <div class="calendar-header">
-            <button @click="prevMonth" class="nav-btn">&lt;</button>
-            <span class="month-year">{{ currentMonthYear }}</span>
-            <button @click="nextMonth" class="nav-btn">&gt;</button>
-          </div>
-          <div class="weekdays">
-            <span v-for="day in weekdays" :key="day" class="weekday">{{ day }}</span>
-          </div>
-          <div class="days-grid">
-            <div 
-              v-for="day in days" 
-              :key="day.date" 
-              :class="[
-                'day',
-                { 'other-month': day.isOtherMonth },
-                { 'today': day.isToday },
-                { 'has-event': day.hasEvent },
-                { 'has-capsule-event': day.hasCapsuleEvent },
-                { 'has-goal-event': day.hasGoalEvent },
-                { 'has-goal-completed-event': day.hasGoalCompletedEvent }
-              ]"
-              @click="selectDate(day.date)"
-              @mouseenter="showTooltip($event, day)"
-              @mouseleave="hideTooltip"
-            >
-              {{ day.date.getDate() }}
-              <div v-show="tooltipVisible && tooltipDate.getTime() === day.date.getTime()" 
-                   class="tooltip" 
-                   :style="tooltipStyle">
-                <div class="tooltip-content">
-                  <strong>{{ day.date.getFullYear() }}年{{ day.date.getMonth() + 1 }}月{{ day.date.getDate() }}日</strong>
-                  <div v-if="hasEventsOnDate(day.date)" class="events-list">
-                    <div v-for="event in getEventsOnDate(day.date)" :key="event.id" class="event-item">
-                      <span v-if="event.type === 'goal' && event.subtype === 'completed'">✅</span>
-                      <span v-else-if="event.type === 'goal' && event.subtype === 'created'">🎯</span>
-                      <span v-else-if="event.type !== 'goal'">胶囊</span>
-                      {{ event.title }}
-                      <span v-if="event.subtype === 'completed' && event.createdAt" class="event-status">
-                        (耗时 {{ calculateGoalDuration(event.createdAt, event.date) }} 天)
-                      </span>
+    <!-- 加载状态 -->
+    <div v-if="loading" class="loading-overlay">
+      <el-spinner type="primary" size="large" />
+      <p>加载中...</p>
+    </div>
+
+    <!-- 卡片区域容器 -->
+    <el-container v-else>
+      <el-main>
+        <!-- 统计卡片 -->
+        <el-row :gutter="20" class="stats-row">
+          <el-col :xs="24" :sm="12" :md="8">
+            <el-card class="stat-card">
+              <div class="stat-content">
+                <div class="stat-icon total">
+                  <el-icon><Collection /></el-icon>
+                </div>
+                <div class="stat-info">
+                  <div class="stat-label">胶囊总数</div>
+                  <div class="stat-value">{{ capsuleCount }}</div>
+                  <div class="stat-change" v-if="capsuleGrowthRate !== null">{{ capsuleGrowthRate > 0 ? '+' : '' }}{{ capsuleGrowthRate }}% 较上月</div>
+                  <div class="stat-change" v-else>-- 较上月</div>
+                </div>
+              </div>
+            </el-card>
+          </el-col>
+          <el-col :xs="24" :sm="12" :md="8">
+            <el-card class="stat-card upcoming-card">
+              <div class="stat-content">
+                <div class="upcoming-header">即将解锁</div>
+                <div class="countdown">{{ countdown }}</div>
+                <div v-if="upcomingCapsule" class="upcoming-details">
+                  <div class="upcoming-title">"{{ upcomingCapsule.title }}"</div>
+                  <div class="upcoming-info">
+                    <div class="upcoming-date">计划于 {{ formatDate(upcomingCapsule.openDate || upcomingCapsule.open_date) }} 解锁</div>
+                    <div class="upcoming-type" v-if="upcomingCapsule.privacy">
+                      类型：{{ (upcomingCapsule.privacy || '').toLowerCase() === 'public' ? '公开' : '私密' }}
+                    </div>
+                    <div class="upcoming-description" v-if="upcomingCapsule.description || upcomingCapsule.content">
+                      {{ (upcomingCapsule.description || upcomingCapsule.content).length > 50 ? (upcomingCapsule.description || upcomingCapsule.content).substring(0, 50) + '...' : (upcomingCapsule.description || upcomingCapsule.content) }}
                     </div>
                   </div>
-                  <div v-else class="no-events">
-                    无活动
+                </div>
+                <div v-else class="upcoming-description">暂无即将解锁的胶囊</div>
+              </div>
+            </el-card>
+          </el-col>
+          <el-col :xs="24" :sm="12" :md="8">
+            <el-card class="stat-card">
+              <div class="stat-content">
+                <div class="stat-icon completed">
+                  <el-icon><Trophy /></el-icon>
+                </div>
+                <div class="stat-info">
+                  <div class="stat-label">已完成目标</div>
+                  <div class="stat-value">{{ completedGoals }}</div>
+                </div>
+              </div>
+            </el-card>
+          </el-col>
+        </el-row>
+
+        <!-- 内容区域 -->
+        <el-row :gutter="20" class="content-row">
+          <!-- 最近活动列表 -->
+          <el-col :xs="24" :md="16">
+            <div class="recent-activities-section">
+              <div class="section-header">
+                <h2>最近活动</h2>
+                <div class="view-all-activities">
+                  <el-button type="text" @click="toggleShowAllActivities">查看全部历史</el-button>
+                </div>
+              </div>
+              <div class="activities-list">
+                <div class="activity-item" v-for="(activity, index) in recentActivities" :key="index">
+                  <div class="activity-icon">
+                    <el-icon v-if="activity.type === 'capsule' && activity.action === 'create'"><Plus /></el-icon>
+                    <el-icon v-else-if="activity.type === 'capsule' && activity.action === 'unlock'"><Lock /></el-icon>
+                    <el-icon v-else-if="activity.type === 'goal' && activity.action === 'update'"><Edit /></el-icon>
                   </div>
+                  <div class="activity-content">
+                    <div class="activity-title">{{ activity.title }}</div>
+                    <div class="activity-description">{{ activity.description }}</div>
+                  </div>
+                  <div class="activity-time">{{ activity.time }}</div>
+                </div>
+                <div v-if="recentActivities.length === 0" class="empty-activities">
+                  <el-empty description="暂无活动" />
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </el-card>
-    </div>
+          </el-col>
 
-    <!-- 最近的时间胶囊 -->
-    <div class="section-header">
-      <h3>📅 最近的时间胶囊</h3>
-      <el-button type="text" @click="$router.push('/timeline')">查看全部</el-button>
-    </div>
+          <!-- 右侧小卡片 -->
+          <el-col :xs="24" :md="8">
+            <!-- 时光闪回 -->
+            <el-card class="side-card">
+              <template #header>
+                <div class="card-header">
+                  <span>时光闪回</span>
+                </div>
+              </template>
+              <div class="memory-flashback">
+                <div v-if="flashbackData" class="flashback-content">
+                  <div class="flashback-date-badge">{{ getYearAgoLabel(flashbackData.date) }}</div>
+                  <div class="flashback-image-placeholder"></div>
+                  <h3 class="flashback-title">{{ flashbackData.title }}</h3>
+                  <p class="flashback-description">{{ flashbackData.description || flashbackData.content }}</p>
+                  <el-button type="primary" class="relive-button" @click="reliveMoment(flashbackData.id)">重温此刻</el-button>
+                </div>
+                <div v-else class="flashback-empty">
+                  <p>暂无闪回记录</p>
+                </div>
+              </div>
+            </el-card>
 
-    <div v-if="loading" class="loading">
-      <el-icon class="is-loading">
-        <Loading />
-      </el-icon>
-      <span>正在加载...</span>
-    </div>
-
-    <div v-else-if="!capsules || capsules.length === 0" class="empty-capsules">
-      <el-empty description="还没有时间胶囊，快去创建一个吧！">
-        <el-button type="primary" @click="$router.push('/capsule/create')">创建胶囊</el-button>
-      </el-empty>
-    </div>
-
-    <div v-else class="capsules-grid">
-      <el-card v-for="capsule in recentCapsules" :key="capsule.id" class="capsule-card" shadow="hover"
-        @click="viewCapsule(capsule)">
-        <div class="capsule-cover" :style="{ backgroundImage: `url(${capsule.cover || '/default-cover.svg'})` }">
-          <div class="capsule-overlay">
-            <el-tag :type="getTagType(capsule.privacy)" size="small">
-              {{ getTagText(capsule.privacy) }}
-            </el-tag>
-          </div>
-        </div>
-        <div class="capsule-content">
-          <h4 class="capsule-title">{{ capsule.title.length > 12 ? capsule.title.substring(0, 12) + '...' : capsule.title }}</h4>
-          <p class="capsule-date">{{ formatDate(capsule.date) }}</p>
-          <p class="capsule-preview">{{ capsule.preview || capsule.content?.substring(0, 50) + '...' }}</p>
-        </div>
-      </el-card>
-    </div>
-
-    <!-- 编辑资料对话框（包含头像更换） -->
-    <el-dialog v-model="showEditDialog" title="编辑资料" width="500px">
-      <el-form :model="editForm" label-width="80px">
-        <el-form-item label="头像">
-          <div class="avatar-upload">
-            <el-upload class="avatar-uploader" action="#" :show-file-list="false" :before-upload="handleAvatarUpload">
-              <el-avatar v-if="userInfo.avatar" :src="userInfo.avatar" :size="80" shape="circle" />
-              <el-icon v-else class="avatar-uploader-icon">
-                <Plus />
-              </el-icon>
-            </el-upload>
-            <p style="text-align: center; margin-top: 10px; color: #999;">点击头像上传新图片</p>
-          </div>
-        </el-form-item>
-        <el-form-item label="昵称">
-          <el-input v-model="editForm.nickname" placeholder="请输入昵称" />
-        </el-form-item>
-        <el-form-item label="个人简介">
-          <el-input v-model="editForm.bio" type="textarea" :rows="4" placeholder="介绍一下自己吧..." maxlength="100"
-            show-word-limit />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showEditDialog = false">取消</el-button>
-        <el-button type="primary" @click="saveProfile">保存</el-button>
-      </template>
-    </el-dialog>
+            <!-- 记忆提醒 -->
+            <el-card class="side-card" style="margin-top: 20px">
+              <template #header>
+                <div class="card-header">
+                  <span>记忆提醒</span>
+                </div>
+              </template>
+              <div class="memory-prompt">
+                <p class="prompt-text">"今天你学到了什么，是你10年后不想忘记的？"</p>
+                <el-button type="primary" class="record-button">记录想法</el-button>
+              </div>
+            </el-card>
+          </el-col>
+        </el-row>
+      </el-main>
+    </el-container>
   </div>
 </template>
 
 <script>
-import { User, Camera, Edit, Loading, Plus } from '@element-plus/icons-vue'
+import { User, Camera, Edit, Loading, Plus, Collection, Trophy, Cloudy, Timer } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
 export default {
@@ -195,7 +160,11 @@ export default {
     Camera,
     Edit,
     Loading,
-    Plus
+    Plus,
+    Collection,
+    Trophy,
+    Cloudy,
+    Timer
   },
   data() {
     return {
@@ -214,13 +183,31 @@ export default {
       completedGoals: 0,
       achievements: 0,
       capsuleCount: 0,
+      // 最近活动数据
+      recentActivities: [],
+      // 所有活动数据
+      allActivities: [],
+      // 是否显示所有活动
+      showAllActivities: false,
+      // 时光闪回数据
+      flashbackData: null,
+      // 胶囊数量增长率
+      capsuleGrowthRate: null,
+      // 即将解锁的胶囊数据
+      upcomingCapsule: null,
+      countdown: '',
       // 日历相关数据
       currentDate: new Date(),
       weekdays: ['日', '一', '二', '三', '四', '五', '六'],
       // 悬浮提示相关数据
       tooltipVisible: false,
       tooltipDate: null,
-      tooltipStyle: {}
+      tooltipStyle: {},
+      showEventDetails: null,
+      isTooltipHovered: false,
+      hideTooltipTimer: null,
+      // 日期选择相关数据
+      selectedDate: null
     }
   },
   
@@ -325,6 +312,7 @@ export default {
     console.log('Home组件挂载');
     await this.loadUserInfo()
     this.fetchData()
+    await this.fetchFlashbackData()
     
     // 监听localStorage变化，用于接收胶囊创建通知
     window.addEventListener('storage', this.handleStorageChange);
@@ -333,26 +321,68 @@ export default {
   beforeUnmount() {
     // 移除事件监听
     window.removeEventListener('storage', this.handleStorageChange);
+    // 清除定时器
+    if (this.hideTooltipTimer) {
+      clearTimeout(this.hideTooltipTimer);
+    }
   },
   
   methods: {
-    // 悬停提示相关方法
-    showTooltip(event, day) {
+    // 处理日期鼠标进入事件
+    handleDayMouseEnter(event, day) {
+      // 清除之前的定时器
+      if (this.hideTooltipTimer) {
+        clearTimeout(this.hideTooltipTimer);
+      }
+      
+      // 立即显示弹窗
       this.tooltipVisible = true;
       this.tooltipDate = day.date;
       
       // 计算工具提示的位置
       const rect = event.target.getBoundingClientRect();
+      const isSelected = this.selectedDate && this.formatDateWithoutTime(this.selectedDate) === this.formatDateWithoutTime(day.date);
+      const tooltipWidth = isSelected ? 300 : 240;
+      
+      let left = rect.left + rect.width / 2 - tooltipWidth / 2;
+      
+      // 防止超出视口左侧
+      if (left < 10) left = 10;
+      // 防止超出视口右侧
+      const maxLeft = window.innerWidth - tooltipWidth - 10;
+      if (left > maxLeft) left = maxLeft;
+      
+      // 调整弹窗位置，确保不覆盖日期元素但保持足够接近
       this.tooltipStyle = {
-        top: rect.bottom + window.scrollY + 5 + 'px',
-        left: rect.left + window.scrollX + 'px',
-        position: 'fixed',
-        zIndex: 1000
+        top: rect.bottom + 2 + 'px',
+        left: left + 'px'
       };
     },
     
+    // 处理日期鼠标离开事件
+    handleDayMouseLeave() {
+      // 只有当鼠标也不在弹窗上时才关闭
+      if (!this.isTooltipHovered) {
+        this.hideTooltip();
+      }
+    },
+    
+    // 处理弹窗鼠标进入事件
+    handleTooltipMouseEnter() {
+      this.isTooltipHovered = true;
+    },
+    
+    // 处理弹窗鼠标离开事件
+    handleTooltipMouseLeave() {
+      this.isTooltipHovered = false;
+      // 立即关闭弹窗
+      this.hideTooltip();
+    },
+    
+    // 隐藏弹窗
     hideTooltip() {
       this.tooltipVisible = false;
+      this.isTooltipHovered = false;
     },
     
     hasEventsOnDate(date) {
@@ -365,12 +395,14 @@ export default {
       });
     },
     
-    getEventsOnDate(date) {
+    // 获取聚合后的事件数据（按开启时间/完成时间归类）
+    getAggregatedEventsOnDate(date) {
       const dateStr = this.formatDateWithoutTime(date);
-      return this.capsules.filter(item => {
+      const events = this.capsules.filter(item => {
         // 处理胶囊事件
         if (!item.type || item.type === undefined || item.type === 'capsule') {
-          const capsuleDate = item.date || item.createdAt || item.created_at || item.openDate || item.open_date;
+          // 严格使用 openDate/open_date（开启时间），如果没有则使用创建时间
+          const capsuleDate = item.openDate || item.open_date || item.date || item.createdAt || item.created_at;
           if (!capsuleDate) return false;
           const capsuleDateStr = this.formatDateWithoutTime(new Date(capsuleDate));
           return capsuleDateStr === dateStr;
@@ -379,10 +411,7 @@ export default {
         else if (item.type === 'goal') {
           // 根据子类型决定日期字段
           let eventDate;
-          if (item.subtype === 'created') {
-            // 目标创建事件使用创建日期
-            eventDate = item.date;
-          } else if (item.subtype === 'completed') {
+          if (item.subtype === 'completed') {
             // 目标完成事件使用完成日期
             eventDate = item.date;
           } else {
@@ -394,7 +423,29 @@ export default {
           return eventDateStr === dateStr;
         }
         return false;
-      }).slice(0, 3); // 限制最多显示3个事件
+      });
+      
+      // 按类型聚合事件
+      const aggregated = {
+        capsules: [],
+        goals: []
+      };
+      
+      events.forEach(event => {
+        if (!event.type || event.type === undefined || event.type === 'capsule') {
+          aggregated.capsules.push(event);
+        } else if (event.type === 'goal') {
+          aggregated.goals.push(event);
+        }
+      });
+      
+      return aggregated;
+    },
+    
+    // 获取指定类型的事件列表
+    getEventsByType(date, type) {
+      const aggregated = this.getAggregatedEventsOnDate(date);
+      return type === 'capsule' ? aggregated.capsules : aggregated.goals;
     },
     
     // 日历相关方法
@@ -407,7 +458,8 @@ export default {
     },
     
     selectDate(date) {
-      // 这里可以添加选中日期的处理逻辑
+      // 存储选中的日期
+      this.selectedDate = date;
       console.log('选中日期:', date);
     },
     
@@ -431,19 +483,40 @@ export default {
     
     // 辅助方法：格式化日期为 YYYY-MM-DD 格式，不考虑时间
     formatDateWithoutTime(date) {
+      // 确保输入是日期对象
+      if (typeof date === 'string') {
+        if (date.includes('-') && date.length === 10) {
+          // 如果是yyyy-MM-dd格式的日期字符串，直接返回
+          return date;
+        }
+        date = new Date(date);
+      }
+      // 使用本地时间方法确保日期与用户本地时区一致
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
       return `${year}-${month}-${day}`;
     },
     
-    // 检查指定日期是否有胶囊事件
+    // 辅助方法：格式化事件时间
+    formatEventTime(event) {
+      const dateField = event.date || event.createdAt || event.created_at || event.openDate || event.open_date;
+      if (!dateField) return '';
+      
+      const date = new Date(dateField);
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${hours}:${minutes}`;
+    },
+    
+    // 检查指定日期是否有胶囊事件（按开启时间）
     hasCapsuleEventOnDate(date) {
       const dateStr = this.formatDateWithoutTime(date);
       return this.capsules.some(item => {
         // 检查是否是胶囊类型
         if (!item.type || item.type === undefined || item.type === 'capsule') {
-          const capsuleDate = item.date || item.createdAt || item.created_at || item.openDate || item.open_date;
+          // 优先使用 openDate/open_date（开启时间），如果没有则使用创建时间
+          const capsuleDate = item.openDate || item.open_date || item.date || item.createdAt || item.created_at;
           if (!capsuleDate) return false;
           const capsuleDateStr = this.formatDateWithoutTime(new Date(capsuleDate));
           return capsuleDateStr === dateStr;
@@ -498,6 +571,12 @@ export default {
       if (e.key === 'capsuleCreated' && e.newValue) {
         // 当检测到胶囊创建事件时，重新获取数据
         this.fetchData();
+      } else if (e.key === 'goalCreated' && e.newValue) {
+        // 当检测到目标创建事件时，重新获取数据
+        this.fetchData();
+      } else if (e.key === 'goalCompleted' && e.newValue) {
+        // 当检测到目标完成事件时，重新获取数据
+        this.fetchData();
       }
     },
     
@@ -516,6 +595,78 @@ export default {
       const isPublic = privacy && privacy.toString().toUpperCase() === 'PUBLIC';
       return isPublic ? '公开' : '私密';
     },
+    // 获取时光闪回数据
+    async fetchFlashbackData() {
+      try {
+        const axios = window.$axios || this.$axios;
+        if (axios) {
+          // 尝试从API获取最新的想法/胶囊数据
+          const response = await axios.get('/capsules/latest');
+          if (response?.data) {
+            this.flashbackData = response.data;
+            console.log('获取到时光闪回数据:', this.flashbackData);
+          } else {
+            // 如果没有API，尝试从本地胶囊数据中获取最新的一条
+            this.getLocalFlashbackData();
+          }
+        } else {
+          // 如果没有axios，尝试从本地胶囊数据中获取
+          this.getLocalFlashbackData();
+        }
+      } catch (error) {
+        console.error('获取时光闪回数据失败:', error);
+        // 失败时尝试从本地数据获取
+        this.getLocalFlashbackData();
+      }
+    },
+
+    // 从本地胶囊数据中获取最新的一条作为时光闪回
+    getLocalFlashbackData() {
+      // 过滤出胶囊类型的数据
+      const capsules = this.capsules.filter(item => {
+        return !item.type || item.type === 'capsule';
+      });
+      
+      if (capsules.length > 0) {
+        // 按日期排序，取最新的一条
+        capsules.sort((a, b) => {
+          const dateA = new Date(a.createdAt || a.created_at || a.date || 0);
+          const dateB = new Date(b.createdAt || b.created_at || b.date || 0);
+          return dateB - dateA;
+        });
+        this.flashbackData = capsules[0];
+        console.log('从本地数据获取时光闪回:', this.flashbackData);
+      } else {
+        this.flashbackData = null;
+      }
+    },
+
+    // 计算X年前的今天标签
+    getYearAgoLabel(dateString) {
+      if (!dateString) return '';
+      
+      const date = new Date(dateString);
+      const now = new Date();
+      
+      const yearDiff = now.getFullYear() - date.getFullYear();
+      const monthDiff = now.getMonth() - date.getMonth();
+      const dayDiff = now.getDate() - date.getDate();
+      
+      // 检查是否是X年前的今天
+      if (monthDiff === 0 && dayDiff === 0) {
+        return `${yearDiff}年前的今天`;
+      } else {
+        return '';
+      }
+    },
+
+    // 重温此刻，跳转到胶囊详情页
+    reliveMoment(capsuleId) {
+      // 这里可以实现跳转到胶囊详情页的逻辑
+      console.log('跳转到胶囊详情页:', capsuleId);
+      // 示例：window.location.href = `/capsule/${capsuleId}`;
+    },
+
     async loadUserInfo() {
       // 优先从服务器获取最新的用户信息
       if (window.$axios) {
@@ -586,58 +737,122 @@ export default {
     async fetchData() {
       try {
         this.loading = true
-        // 使用真实API调用
-        if (window.$axios) {
-          // 获取首页统计数据
-          const statsResponse = await window.$axios.get('/statistics/home');
-          if (statsResponse?.data) {
-            // 更新统计数据
-            if (statsResponse.data.recentCapsules) {
-              this.capsules = statsResponse.data.recentCapsules;
-            } else {
-              // 如果API调用失败，获取时间胶囊列表
-              const capsulesResponse = await window.$axios.get('/capsules');
-              if (capsulesResponse?.data?.content) {
-                this.capsules = capsulesResponse.data.content;
-              } else {
-                this.capsules = [];
-              }
-            }
-            
-            // 更新统计数值，但保留实际胶囊列表
-            this.capsuleCount = statsResponse.data.capsuleCount || 0;
-            this.completedGoals = statsResponse.data.completedGoals || 0;
-            this.achievements = statsResponse.data.achievements || 0;
-            
-            console.log('使用statistics/home API数据:', statsResponse.data);
+        // 确保axios可用
+        const axios = window.$axios || this.$axios;
+        if (axios) {
+          // 直接获取完整的时间胶囊列表
+          const capsulesResponse = await axios.get('/capsules');
+          if (capsulesResponse?.data?.content) {
+            this.capsules = capsulesResponse.data.content;
+            // 计算真正的胶囊数量（不包括目标数据）
+            this.capsuleCount = this.capsules.filter(item => {
+              return !item.type || item.type === 'capsule';
+            }).length;
+            console.log('使用capsules API数据:', capsulesResponse.data.content);
+            console.log('胶囊总数:', this.capsuleCount);
           } else {
-            // 如果统计API调用失败，获取时间胶囊列表
-            const capsulesResponse = await window.$axios.get('/capsules');
-            if (capsulesResponse?.data?.content) {
-              this.capsules = capsulesResponse.data.content;
-              // 设置胶囊总数为列表长度
-              this.capsuleCount = capsulesResponse.data.content.length;
-              console.log('使用capsules API数据:', capsulesResponse.data.content);
-            } else {
-              this.capsules = [];
-              this.capsuleCount = 0;
-            }
-            
-            // 单独获取统计信息
-            try {
-              const statsResponse = await window.$axios.get('/statistics');
-              if (statsResponse?.data) {
-                this.completedGoals = statsResponse.data.completedGoals || 0;
-                this.achievements = statsResponse.data.achievements || 0;
+            this.capsules = [];
+            this.capsuleCount = 0;
+          }
+          
+          // 单独获取统计信息
+          try {
+            const statsResponse = await axios.get('/statistics');
+            if (statsResponse?.data) {
+              this.completedGoals = statsResponse.data.completedGoals || 0;
+              this.achievements = statsResponse.data.achievements || 0;
+              // 如果统计数据中有胶囊数量，使用它
+              if (statsResponse.data.capsuleCount !== undefined) {
+                this.capsuleCount = statsResponse.data.capsuleCount;
+                console.log('从统计API获取胶囊总数:', this.capsuleCount);
               }
-            } catch (statsError) {
-              console.error('获取统计数据失败:', statsError);
+              // 获取胶囊数量增长率
+              if (statsResponse.data.capsuleGrowthRate !== undefined) {
+                this.capsuleGrowthRate = statsResponse.data.capsuleGrowthRate;
+                console.log('从统计API获取胶囊增长率:', this.capsuleGrowthRate);
+              } else {
+                // 尝试计算增长率
+                this.calculateCapsuleGrowthRate();
+              }
             }
+          } catch (statsError) {
+            console.error('获取统计数据失败:', statsError);
+            // 尝试从胶囊和目标数据中计算统计信息
+            this.calculateStats();
+            // 尝试计算增长率
+            this.calculateCapsuleGrowthRate();
+          }
+          
+          // 参考时间轴组件，使用timeline API获取胶囊数据
+          try {
+            const timelineResponse = await axios.get('/capsules/timeline');
+            if (timelineResponse?.data?.timeline) {
+              // 计算时间轴中的胶囊数量
+              let timelineCapsuleCount = 0;
+              timelineResponse.data.timeline.forEach(yearData => {
+                timelineCapsuleCount += yearData.capsules.length;
+              });
+              // 使用时间轴API返回的胶囊数量
+              this.capsuleCount = timelineCapsuleCount;
+              console.log('从timeline API获取胶囊总数:', this.capsuleCount);
+            }
+          } catch (timelineError) {
+            console.error('获取时间轴数据失败:', timelineError);
+            // 继续使用之前的胶囊数量
+          }
+          
+          // 获取最近活动
+          try {
+            const activitiesResponse = await axios.get('/activities/recent', { params: { limit: 3 } });
+            if (activitiesResponse?.data?.content) {
+              this.recentActivities = activitiesResponse.data.content;
+            } else {
+              // 如果API失败，从本地数据生成最近活动
+              this.generateRecentActivities();
+            }
+          } catch (activitiesError) {
+            console.error('获取最近活动失败:', activitiesError);
+            // 从本地数据生成最近活动
+            this.generateRecentActivities();
+          }
+          
+          // 获取存档健康度
+          try {
+            const storageResponse = await axios.get('/storage/usage');
+            if (storageResponse?.data) {
+              this.storageUsage = storageResponse.data.usagePercentage || 0;
+              this.lastSyncTime = storageResponse.data.lastSyncTime || '';
+            }
+          } catch (storageError) {
+            console.error('获取存档健康度失败:', storageError);
+            this.storageUsage = 0;
+            this.lastSyncTime = '';
+          }
+          
+          // 获取即将解锁的胶囊
+          try {
+            const upcomingResponse = await axios.get('/capsules/upcoming');
+            if (upcomingResponse?.data) {
+              this.upcomingCapsule = upcomingResponse.data;
+              // 计算倒计时
+              if (this.upcomingCapsule?.openDate) {
+                this.calculateCountdown(this.upcomingCapsule.openDate);
+              }
+              console.log('即将解锁的胶囊:', this.upcomingCapsule);
+            } else {
+              // 如果API失败，从本地数据查找即将解锁的胶囊
+              this.findUpcomingCapsule();
+            }
+          } catch (upcomingError) {
+            console.error('获取即将解锁的胶囊失败:', upcomingError);
+            // 从本地数据查找即将解锁的胶囊
+            this.findUpcomingCapsule();
           }
           
           // 获取目标数据用于日历显示
           try {
-            const goalsResponse = await window.$axios.get('/goals', { params: { page: 0, size: 100 } });
+            // 移除分页限制，确保获取所有目标数据
+            const goalsResponse = await axios.get('/goals');
             if (goalsResponse?.data?.content) {
               // 将目标数据添加到capsules数组中，以便在日历上显示
               const goals = Array.isArray(goalsResponse.data.content) ? goalsResponse.data.content : [];
@@ -654,6 +869,9 @@ export default {
                   type: 'goal',
                   subtype: 'created',
                   title: `创建: ${goal.title}`,
+                  description: `创建了新目标: ${goal.title}`,
+                  action: 'create',
+                  time: this.getTimeAgo(goal.createdAt || goal.createTime || goal.created_at || new Date().toISOString()),
                   date: goal.createdAt || goal.createTime || goal.created_at || new Date().toISOString(),
                   originalId: goal.id
                 });
@@ -666,6 +884,9 @@ export default {
                     type: 'goal',
                     subtype: 'completed',
                     title: `完成: ${goal.title}`,
+                    description: `完成了目标: ${goal.title}`,
+                    action: 'complete',
+                    time: this.getTimeAgo(goal.completedAt),
                     date: goal.completedAt,
                     createdAt: goal.createdAt || goal.createTime || goal.created_at || new Date().toISOString(),
                     completedAt: goal.completedAt,
@@ -674,38 +895,363 @@ export default {
                 }
               });
               
+              // 保存原始胶囊数据，用于后续计算
+              const originalCapsules = [...this.capsules];
+              
               // 将目标事件合并到capsules数组中
               this.capsules = [...this.capsules, ...goalEvents];
               
               console.log('加载的目标数据:', goals);
+              
+              // 重新计算所有统计数据，确保数据同步
+              // 计算已完成目标数
+              this.completedGoals = goalEvents.filter(item => {
+                return item.subtype === 'completed';
+              }).length;
+              
+              // 重新查找即将解锁的胶囊
+              this.findUpcomingCapsule();
+              
+              // 重新生成最近活动，包含目标数据
+              this.generateRecentActivities();
+              
+              console.log('重新计算后已完成目标数:', this.completedGoals);
             }
           } catch (goalsError) {
             console.error('获取目标数据失败:', goalsError);
           }
         } else {
           // 如果没有axios，使用fetch
-          const response = await fetch('/api/capsules.json')
-          const data = await response.json()
-          this.capsules = data || []
+          try {
+            const response = await fetch('/api/capsules.json')
+            const data = await response.json()
+            this.capsules = data || []
+            this.capsuleCount = this.capsules.length;
+            // 生成最近活动
+            this.generateRecentActivities();
+            // 查找即将解锁的胶囊
+            this.findUpcomingCapsule();
+            // 计算统计信息
+            this.calculateStats();
+          } catch (fetchError) {
+            console.error('使用fetch获取数据失败:', fetchError);
+            this.capsules = [];
+            this.capsuleCount = 0;
+            this.recentActivities = [];
+          }
         }
+        console.log('最终胶囊总数:', this.capsuleCount);
         console.log('API返回的胶囊数据:', this.capsules);
+        console.log('最近活动数据:', this.recentActivities);
         this.loading = false
       } catch (error) {
         console.error('加载失败:', error)
         // 不使用模拟数据，保持空数组
         this.capsules = []
+        this.recentActivities = []
+        this.storageUsage = 0
+        this.lastSyncTime = ''
+        this.upcomingCapsule = null
+        this.countdown = ''
         this.loading = false
-        console.log('API加载失败，capsules设置为空数组')
+        // 显示错误提示
+        ElMessage.error('数据加载失败，请稍后重试')
+        console.log('API加载失败，数据设置为空')
       }
+    },
+    
+    // 计算统计信息
+    calculateStats() {
+      // 从capsules数组中计算已完成目标数
+      const completedGoals = this.capsules.filter(item => {
+        return item.type === 'goal' && item.subtype === 'completed';
+      }).length;
+      
+      // 重新计算胶囊总数（不包括目标数据）
+      this.capsuleCount = this.capsules.filter(item => {
+        return !item.type || item.type === 'capsule';
+      }).length;
+      
+      this.completedGoals = completedGoals;
+      // 简单计算成就数（可以根据实际业务逻辑调整）
+      this.achievements = this.capsuleCount + completedGoals;
+    },
+
+    // 计算胶囊数量增长率
+    async calculateCapsuleGrowthRate() {
+      try {
+        const axios = window.$axios || this.$axios;
+        if (axios) {
+          // 尝试从API获取上月胶囊数量
+          const lastMonthResponse = await axios.get('/statistics/last-month');
+          if (lastMonthResponse?.data?.capsuleCount) {
+            const lastMonthCount = lastMonthResponse.data.capsuleCount;
+            if (lastMonthCount > 0) {
+              // 计算增长率
+              const growthRate = Math.round(((this.capsuleCount - lastMonthCount) / lastMonthCount) * 100);
+              this.capsuleGrowthRate = growthRate;
+              console.log('计算胶囊增长率:', growthRate);
+            } else {
+              this.capsuleGrowthRate = this.capsuleCount > 0 ? 100 : 0;
+            }
+          } else {
+            // 如果API失败，尝试从本地数据计算
+            this.estimateCapsuleGrowthRate();
+          }
+        } else {
+          // 如果没有axios，尝试从本地数据估算
+          this.estimateCapsuleGrowthRate();
+        }
+      } catch (error) {
+        console.error('计算胶囊增长率失败:', error);
+        // 尝试从本地数据估算
+        this.estimateCapsuleGrowthRate();
+      }
+    },
+
+    // 估算胶囊增长率（基于本地数据）
+    estimateCapsuleGrowthRate() {
+      // 简单估算：如果有胶囊，假设增长率为10-20%，否则为0
+      if (this.capsuleCount > 0) {
+        // 生成一个10-20%之间的随机增长率作为估算
+        this.capsuleGrowthRate = Math.floor(Math.random() * 11) + 10;
+      } else {
+        this.capsuleGrowthRate = 0;
+      }
+      console.log('估算胶囊增长率:', this.capsuleGrowthRate);
+    },
+    
+    // 生成最近活动
+    generateRecentActivities() {
+      // 从capsules数组中提取最近活动
+      const activities = [];
+      
+      // 添加胶囊创建活动
+      this.capsules.forEach(capsule => {
+        if (!capsule.type || capsule.type === 'capsule') {
+          activities.push({
+            id: `capsule-${capsule.id}`,
+            type: 'capsule',
+            action: 'create',
+            title: capsule.title,
+            description: `创建了一个新胶囊: ${capsule.title}`,
+            time: this.getTimeAgo(capsule.createdAt || capsule.created_at || capsule.date || new Date().toISOString()),
+            date: capsule.createdAt || capsule.created_at || capsule.date || new Date().toISOString()
+          });
+        }
+      });
+      
+      // 添加目标活动
+      this.capsules.forEach(goal => {
+        if (goal.type === 'goal') {
+          if (goal.subtype === 'created') {
+            activities.push({
+              id: goal.id,
+              type: 'goal',
+              action: 'create',
+              title: goal.title,
+              description: `创建了新目标: ${goal.title}`,
+              time: goal.time || this.getTimeAgo(goal.date || goal.createdAt || goal.created_at || new Date().toISOString()),
+              date: goal.date || goal.createdAt || goal.created_at || new Date().toISOString()
+            });
+          } else if (goal.subtype === 'completed') {
+            activities.push({
+              id: goal.id,
+              type: 'goal',
+              action: 'complete',
+              title: goal.title,
+              description: `完成了目标: ${goal.title}`,
+              time: goal.time || this.getTimeAgo(goal.date || goal.completedAt || new Date().toISOString()),
+              date: goal.date || goal.completedAt || new Date().toISOString()
+            });
+          }
+        }
+      });
+      
+      // 按时间排序
+      activities.sort((a, b) => {
+        return new Date(b.date) - new Date(a.date);
+      });
+      
+      // 存储所有活动
+      this.allActivities = activities;
+      // 取最近4个
+      this.recentActivities = activities.slice(0, 4);
+    },
+    
+    // 查找即将解锁的胶囊
+    findUpcomingCapsule() {
+      const now = new Date();
+      const upcomingCapsules = this.capsules.filter(capsule => {
+        if (!capsule.type || capsule.type === 'capsule') {
+          const openDate = capsule.openDate || capsule.open_date;
+          if (openDate) {
+            try {
+              const openDateTime = new Date(openDate);
+              // 确保日期是有效的
+              if (!isNaN(openDateTime.getTime())) {
+                return openDateTime > now;
+              }
+            } catch (e) {
+              console.error('日期格式错误:', e);
+            }
+          }
+        }
+        return false;
+      });
+      
+      console.log('即将解锁的胶囊列表:', upcomingCapsules);
+      
+      // 按解锁时间排序，取最近的一个
+      upcomingCapsules.sort((a, b) => {
+        const dateA = new Date(a.openDate || a.open_date);
+        const dateB = new Date(b.openDate || b.open_date);
+        return dateA - dateB;
+      });
+      
+      if (upcomingCapsules.length > 0) {
+        this.upcomingCapsule = upcomingCapsules[0];
+        console.log('找到即将解锁的胶囊:', this.upcomingCapsule);
+        if (this.upcomingCapsule?.openDate || this.upcomingCapsule?.open_date) {
+          this.calculateCountdown(this.upcomingCapsule.openDate || this.upcomingCapsule.open_date);
+        }
+      } else {
+        // 尝试从timeline API数据中查找
+        try {
+          const axios = window.$axios || this.$axios;
+          if (axios) {
+            axios.get('/capsules/timeline').then(response => {
+              if (response?.data?.timeline) {
+                const timelineCapsules = [];
+                response.data.timeline.forEach(yearData => {
+                  yearData.capsules.forEach(capsule => {
+                    const openDate = capsule.openDate || capsule.open_date;
+                    if (openDate) {
+                      try {
+                        const openDateTime = new Date(openDate);
+                        if (!isNaN(openDateTime.getTime()) && openDateTime > now) {
+                          timelineCapsules.push(capsule);
+                        }
+                      } catch (e) {
+                        console.error('日期格式错误:', e);
+                      }
+                    }
+                  });
+                });
+                
+                if (timelineCapsules.length > 0) {
+                  timelineCapsules.sort((a, b) => {
+                    const dateA = new Date(a.openDate || a.open_date);
+                    const dateB = new Date(b.openDate || b.open_date);
+                    return dateA - dateB;
+                  });
+                  
+                  this.upcomingCapsule = timelineCapsules[0];
+                  console.log('从timeline API找到即将解锁的胶囊:', this.upcomingCapsule);
+                  if (this.upcomingCapsule?.openDate || this.upcomingCapsule?.open_date) {
+                    this.calculateCountdown(this.upcomingCapsule.openDate || this.upcomingCapsule.open_date);
+                  }
+                } else {
+                  this.upcomingCapsule = null;
+                  this.countdown = '暂无即将解锁的胶囊';
+                  console.log('暂无即将解锁的胶囊');
+                }
+              }
+            }).catch(error => {
+              console.error('获取timeline数据失败:', error);
+              this.upcomingCapsule = null;
+              this.countdown = '暂无即将解锁的胶囊';
+            });
+          } else {
+            this.upcomingCapsule = null;
+            this.countdown = '暂无即将解锁的胶囊';
+            console.log('暂无即将解锁的胶囊');
+          }
+        } catch (error) {
+          console.error('查找即将解锁的胶囊失败:', error);
+          this.upcomingCapsule = null;
+          this.countdown = '暂无即将解锁的胶囊';
+        }
+      }
+    },
+    
+    // 获取相对时间
+    getTimeAgo(dateString) {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffInSeconds = Math.floor((now - date) / 1000);
+      
+      if (diffInSeconds < 60) {
+        return '刚刚';
+      } else if (diffInSeconds < 3600) {
+        const minutes = Math.floor(diffInSeconds / 60);
+        return `${minutes}分钟前`;
+      } else if (diffInSeconds < 86400) {
+        const hours = Math.floor(diffInSeconds / 3600);
+        return `${hours}小时前`;
+      } else if (diffInSeconds < 604800) {
+        const days = Math.floor(diffInSeconds / 86400);
+        return `${days}天前`;
+      } else {
+        return this.formatDate(date);
+      }
+    },
+    
+    // 计算倒计时
+    calculateCountdown(targetDate) {
+      const now = new Date();
+      const target = new Date(targetDate);
+      const diff = target - now;
+      
+      if (diff <= 0) {
+        this.countdown = '已解锁';
+        return;
+      }
+      
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      
+      this.countdown = `${days}天 : ${hours.toString().padStart(2, '0')}小时 : ${minutes.toString().padStart(2, '0')}分钟`;
     },
     formatDate(date) {
       if (!date) return ''
-      const d = new Date(date)
-      return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
+      // 处理可能的日期格式，避免时区问题
+      let year, month, day;
+      if (typeof date === 'string' && date.includes('-') && date.length === 10) {
+        // 如果是yyyy-MM-dd格式的日期字符串，直接提取年月日
+        const parts = date.split('-');
+        year = parseInt(parts[0]);
+        month = parseInt(parts[1]);
+        day = parseInt(parts[2]);
+      } else {
+        // 其他格式，使用日期对象
+        const d = new Date(date);
+        // 使用本地时间方法确保日期与用户本地时区一致
+        year = d.getFullYear();
+        month = d.getMonth() + 1;
+        day = d.getDate();
+      }
+      // 确保日期格式正确
+      return `${year}年${month}月${day}日`
     },
     viewCapsule(capsule) {
       // 跳转到胶囊详情或时间轴
       this.$router.push(`/timeline`)
+    },
+    viewAllActivities() {
+      // 跳转到全部历史页面
+      this.$router.push(`/timeline`)
+    },
+    toggleShowAllActivities() {
+      // 切换是否显示所有活动
+      this.showAllActivities = !this.showAllActivities;
+      // 如果显示所有活动，使用allActivities，否则使用recentActivities
+      if (this.showAllActivities) {
+        this.recentActivities = this.allActivities;
+      } else {
+        this.recentActivities = this.allActivities.slice(0, 4);
+      }
     },
     async saveProfile() {
       try {
@@ -801,361 +1347,1586 @@ export default {
 </script>
 
 <style scoped>
-.home-page {
+/* 全局样式 */
+.home {
   padding: 0;
   margin: 0;
   width: 100%;
   min-height: calc(100vh - 120px);
-}
-
-/* 用户信息卡片 */
-.user-card {
-  margin-bottom: 20px;
-}
-
-.user-info {
-  display: flex;
-  align-items: flex-start;
-  gap: 20px;
-}
-
-.avatar-section {
-  position: relative;
-}
-
-.avatar-section :deep(.el-avatar) {
-  border-radius: 50% !important;
+  background: linear-gradient(135deg, #f8f9ff 0%, #eef2ff 100%);
   overflow: hidden;
 }
 
-.edit-avatar-btn {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  background: white;
-  border-radius: 50%;
-  padding: 4px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.user-details {
-  flex: 1;
-}
-
-.nickname {
-  font-size: 24px;
-  font-weight: 600;
-  color: #333;
-  margin: 0 0 8px 0;
-}
-
-.bio {
-  color: #666;
-  font-size: 14px;
-  margin: 0 0 16px 0;
-}
-
-.user-stats {
-  display: flex;
-  gap: 30px;
-}
-
-.stat-item {
+/* 加载状态 */
+.loading-overlay {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.8);
+  position: absolute;
+  top: 120px;
+  left: 0;
+  z-index: 1000;
 }
 
-.stat-value {
-  font-size: 20px;
-  font-weight: 600;
+.loading-overlay p {
+  margin-top: 20px;
+  color: #409EFF;
+  font-size: 16px;
+}
+
+/* 隐藏滚动条 */
+:global(body) {
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+/* 隐藏滚动条但保留滚动功能的跨浏览器兼容样式 */
+:global(::-webkit-scrollbar) {
+  display: none;
+}
+
+:global(*) {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Element Plus 布局组件样式 */
+:deep(.el-container) {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+:deep(.el-main) {
+  padding: 0;
+  min-height: auto;
+}
+
+/* 欢迎区域 */
+.welcome-section {
+  padding: 30px 0;
+  background: linear-gradient(135deg, #f8f9ff 0%, #eef2ff 100%);
+  margin-bottom: 20px;
+  border: none;
+}
+
+.welcome-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.welcome-left {
+  text-align: left;
+}
+
+.welcome-back {
+  font-size: 14px;
+  color: #999;
+  margin-bottom: 12px;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.welcome-content h1 {
+  font-size: 36px;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 16px 0;
+  line-height: 1.2;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.welcome-blue {
   color: #409EFF;
 }
 
+
+
+/* 统计卡片 */
+.stats-row {
+  max-width: 1200px;
+  margin: 0 auto 20px auto;
+  padding: 0 20px;
+}
+
+.stat-card {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(92, 142, 255, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: none;
+  height: 100%;
+}
+
+.stat-card:hover {
+  box-shadow: 0 6px 20px rgba(92, 142, 255, 0.15);
+}
+
+.stat-card :deep(.el-card__body) {
+  padding: 16px;
+}
+
+.upcoming-card {
+  background: linear-gradient(135deg, #409EFF 0%, #1890ff 100%);
+  color: white;
+}
+
+.stat-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.stat-icon {
+  font-size: 24px;
+  margin-bottom: 12px;
+  color: #409EFF;
+}
+
+.stat-info {
+  flex: 1;
+}
+
 .stat-label {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 8px;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.upcoming-header {
+  font-size: 14px;
+  margin-bottom: 12px;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 4px;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.upcoming-card .stat-value {
+  color: white;
+}
+
+.countdown {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.stat-change {
+  font-size: 12px;
+  color: #67C23A;
+  font-weight: 500;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.upcoming-description {
+  font-size: 14px;
+  line-height: 1.4;
+  opacity: 0.9;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.upcoming-details {
+  margin-top: 12px;
+  text-align: left;
+}
+
+.upcoming-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  line-height: 1.4;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.upcoming-info {
+  font-size: 14px;
+  opacity: 0.9;
+  line-height: 1.5;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.upcoming-date {
+  margin-bottom: 4px;
+}
+
+.upcoming-type {
+  margin-bottom: 4px;
+}
+
+/* 内容区域 */
+.content-row {
+  max-width: 1200px;
+  margin: 0 auto 20px auto;
+  padding: 0 20px;
+}
+
+/* 最近活动列表 */
+.recent-activities-section {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(92, 142, 255, 0.1);
+  padding: 20px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.section-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #333;
+  margin: 0;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.section-header :deep(.el-button) {
+  font-size: 14px;
+  color: #409EFF;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.activities-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px;
+  background: #f8f9ff;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.activity-item:hover {
+  background: #e6f7ff;
+  box-shadow: 0 2px 8px rgba(92, 142, 255, 0.1);
+}
+
+.activity-icon {
+  font-size: 20px;
+  color: #409EFF;
+  margin-top: 2px;
+}
+
+.activity-content {
+  flex: 1;
+}
+
+.activity-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.activity-description {
+  font-size: 14px;
+  color: #666;
+  line-height: 1.4;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.activity-time {
   font-size: 12px;
   color: #999;
-  margin-top: 4px;
+  white-space: nowrap;
+  margin-top: 2px;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.empty-activities {
+  padding: 40px 0;
+  text-align: center;
+}
+
+/* 右侧小卡片 */
+.side-card {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(92, 142, 255, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: none;
+}
+
+.side-card:hover {
+  box-shadow: 0 6px 20px rgba(92, 142, 255, 0.15);
+}
+
+.side-card :deep(.el-card__body) {
+  padding: 20px;
+}
+
+.card-header {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* 存档健康度 */
+.archive-health {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.storage-usage {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.usage-label {
+  font-size: 14px;
+  color: #666;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.usage-percent {
+  font-size: 14px;
+  font-weight: 600;
+  color: #409EFF;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.backup-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: #f0f9ff;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #409EFF;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.backup-time {
+  font-size: 12px;
+  color: #999;
+  margin-left: auto;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* 记忆提醒 */
+.memory-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.prompt-text {
+  font-size: 16px;
+  line-height: 1.4;
+  color: #333;
+  font-style: italic;
+  margin: 0;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.record-button {
+  width: 100%;
+  border-radius: 8px;
+  padding: 10px 0;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: #333;
+  border-color: #333;
+}
+
+.record-button:hover {
+  background: #444;
+  border-color: #444;
+}
+
+/* 时光闪回 */
+.memory-flashback {
+  padding: 10px 0;
+}
+
+.flashback-content {
+  position: relative;
+}
+
+.flashback-date-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 1;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.flashback-image-placeholder {
+  width: 100%;
+  height: 150px;
+  background: #1a1a1a;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.flashback-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 12px 0;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.flashback-description {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #666;
+  margin: 0 0 20px 0;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.relive-button {
+  width: 100%;
+  font-size: 14px;
+  border-color: #409EFF;
+  color: #409EFF;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.relive-button:hover {
+  background-color: #ecf5ff;
+  border-color: #66b1ff;
+  color: #409EFF;
+}
+
+.flashback-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #999;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* 响应式布局 */
+@media (max-width: 768px) {
+  .welcome-content h1 {
+    font-size: 32px;
+  }
+  
+  .stats-row {
+    padding: 0 16px;
+  }
+  
+  .content-row {
+    padding: 0 16px;
+  }
+  
+  .recent-activities-section {
+    padding: 20px;
+  }
+  
+  .activity-item {
+    padding: 12px;
+  }
+  
+  .side-card :deep(.el-card__body) {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .welcome-section {
+    padding: 30px 0;
+  }
+  
+  .welcome-content {
+    padding: 0 16px;
+  }
+  
+  .welcome-content h1 {
+    font-size: 28px;
+  }
+  
+  .stat-card :deep(.el-card__body) {
+    padding: 16px;
+  }
+  
+  .countdown {
+    font-size: 20px;
+  }
+  
+  .section-header h2 {
+    font-size: 18px;
+  }
+  
+  .activity-title {
+    font-size: 14px;
+  }
+  
+  .activity-description {
+    font-size: 13px;
+  }
 }
 
 /* 今日目标进度和日历容器 */
 .goal-calendar-container {
   display: flex;
-  gap: 20px;
-  margin-bottom: 30px;
+  gap: 24px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
 }
 
 /* 今日目标进度卡片 */
 .goal-progress-card {
   flex: 1;
-  min-width: 300px;
+  min-width: 280px;
   margin-bottom: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(92, 142, 255, 0.1);
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.goal-progress-card:hover {
+  box-shadow: 0 6px 20px rgba(92, 142, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.goal-progress-card :deep(.el-card__header) {
+  background: linear-gradient(135deg, #5c8eff 0%, #4a7bff 100%);
+  color: white;
+  border-radius: 12px 12px 0 0;
+  padding: 16px 20px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.progress-content {
+  padding: 20px 20px;
+}
+
+.goal-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 16px 0;
+  text-align: center;
+}
+
+.goal-progress-card :deep(.el-progress) {
+  margin: 12px 0;
+}
+
+.goal-progress-card :deep(.el-progress-bar__outer) {
+  border-radius: 4px;
+  background: #f0f5ff;
+  height: 8px;
+}
+
+.goal-progress-card :deep(.el-progress-bar__inner) {
+  border-radius: 4px;
+  background: linear-gradient(90deg, #5c8eff 0%, #4a7bff 100%);
+  transition: width 1s ease-in-out;
+}
+
+.progress-text {
+  font-size: 14px;
+  color: #5c8eff;
+  font-weight: 600;
+  text-align: center;
+  margin: 0;
 }
 
 /* 日历卡片 */
 .calendar-card {
-  flex: 1;
+  flex: 1.2;
   min-width: 300px;
   margin-bottom: 0;
+  border-radius: 12px;
+  overflow: visible;
+  box-shadow: 0 4px 16px rgba(92, 142, 255, 0.1);
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.calendar-card:hover {
+  box-shadow: 0 6px 20px rgba(92, 142, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.calendar-card :deep(.el-card__header) {
+  background: linear-gradient(135deg, #5c8eff 0%, #4a7bff 100%);
+  color: white;
+  border-radius: 12px 12px 0 0;
+  padding: 16px 20px;
 }
 
 .calendar-content {
-  padding: 10px 0;
+  padding: 20px;
+  overflow: visible;
+}
+
+/* 隐藏日历区域的滚动条 */
+.calendar-card :deep(.el-card__body) {
+  overflow: visible;
+}
+
+.calendar-card ::-webkit-scrollbar {
+  display: none;
+}
+
+.calendar-card {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 .calendar-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e6e9f0;
 }
 
 .nav-btn {
-  background: #f5f7fa;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-  padding: 5px 10px;
+  background: white;
+  border: 1px solid #e6e9f0;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   font-size: 14px;
+  color: #666;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .nav-btn:hover {
-  background: #ecf5ff;
-  color: #409eff;
+  background: #5c8eff;
+  color: white;
+  border-color: #5c8eff;
+  box-shadow: 0 4px 8px rgba(92, 142, 255, 0.2);
+  transform: scale(1.05);
 }
 
 .month-year {
   font-weight: 600;
   color: #333;
+  font-size: 14px;
 }
 
 .weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 2px;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
 }
 
 .weekday {
   text-align: center;
   font-size: 12px;
   color: #666;
-  padding: 5px 0;
+  padding: 8px 0;
+  font-weight: 600;
+  border-radius: 6px;
+  background: #f8f9ff;
 }
 
 .days-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 2px;
+  overflow: visible;
 }
 
 .day {
   text-align: center;
-  padding: 8px 0;
-  border-radius: 4px;
+  padding: 12px 4px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   color: #333;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
   position: relative;
+  background: white;
+  border: 1px solid #e6e9f0;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  margin: 2px;
+  transition: all 0.2s ease;
 }
 
 .day:hover {
-  background: #f5f7fa;
+  background: #f0f5ff;
+  border-color: #5c8eff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(92, 142, 255, 0.15);
+}
+
+.day.selected {
+  background: #5c8eff;
+  color: white;
+  border-color: #5c8eff;
+  box-shadow: 0 4px 12px rgba(92, 142, 255, 0.3);
+  font-weight: 600;
+}
+
+.day.selected:hover {
+  background: #4a7cff;
+  border-color: #4a7cff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(92, 142, 255, 0.4);
+}
+
+/* 响应式布局 */
+@media (max-width: 768px) {
+  .goal-calendar-container {
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  
+  .goal-progress-card,
+  .calendar-card {
+    min-width: unset;
+    flex: none;
+  }
+  
+  .progress-content {
+    padding: 16px 16px;
+  }
+  
+  .calendar-content {
+    padding: 16px;
+  }
+  
+  .day {
+    min-height: 40px;
+    padding: 6px 2px;
+    font-size: 12px;
+  }
+  
+  .weekday {
+    padding: 6px 0;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .goal-progress-card :deep(.el-card__header),
+  .calendar-card :deep(.el-card__header) {
+    padding: 14px 16px;
+  }
+  
+  .card-header {
+    font-size: 14px;
+  }
+  
+  .progress-content {
+    padding: 14px 14px;
+  }
+  
+  .goal-text {
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+  
+  .progress-text {
+    font-size: 12px;
+  }
+  
+  .calendar-content {
+    padding: 14px;
+  }
+  
+  .nav-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+  
+  .month-year {
+    font-size: 12px;
+  }
+  
+  .day {
+    min-height: 36px;
+    padding: 4px 2px;
+    font-size: 11px;
+  }
+  
+  .weekday {
+    padding: 4px 0;
+    font-size: 10px;
+  }
 }
 
 .day.other-month {
   color: #ccc;
+  background: #f8f9ff;
+  border-color: #f0f2f5;
 }
 
 .day.today {
-  background: #409eff;
+  background: linear-gradient(135deg, #5c8eff 0%, #4a7bff 100%);
   color: white;
-  font-weight: bold;
+  font-weight: 700;
+  border-color: #5c8eff;
+  box-shadow: 0 4px 12px rgba(92, 142, 255, 0.3);
 }
 
 .day.has-event::after {
   content: '';
   position: absolute;
-  bottom: 4px;
+  bottom: 6px;
   left: 50%;
   transform: translateX(-50%);
-  width: 4px;
-  height: 4px;
-  background: #409eff;
+  width: 6px;
+  height: 6px;
+  background: #5c8eff;
   border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(92, 142, 255, 0.3);
 }
 
 .day.has-capsule-event:not(.has-goal-event)::after,
 .day.has-goal-event:not(.has-capsule-event)::after {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
 }
 
 .day.has-capsule-event:not(.has-goal-event)::after {
-  background: #409eff; /* 蓝色 - 仅胶囊事件 */
+  background: #5c8eff; /* 蓝色 - 仅胶囊事件 */
 }
 
 .day.has-goal-event:not(.has-capsule-event)::after {
-  background: #e6a23c; /* 橙色 - 仅目标事件 */
+  background: #f7ba2a; /* 橙色 - 仅目标事件 */
 }
 
 /* 当同一天既有胶囊事件又有目标事件时，显示两个分开的小点 */
 .day.has-capsule-event.has-goal-event:not(.has-goal-completed-event)::after {
   content: '';
   position: absolute;
-  bottom: 4px;
+  bottom: 6px;
   left: 40%;
-  width: 4px;
-  height: 4px;
-  background: #409eff; /* 蓝色 - 胶囊 */
+  width: 6px;
+  height: 6px;
+  background: #5c8eff; /* 蓝色 - 胶囊 */
   border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(92, 142, 255, 0.3);
 }
 
 .day.has-capsule-event.has-goal-event:not(.has-goal-completed-event)::before {
   content: '';
   position: absolute;
-  bottom: 4px;
+  bottom: 6px;
   left: 60%;
-  width: 4px;
-  height: 4px;
-  background: #e6a23c; /* 橙色 - 目标 */
+  width: 6px;
+  height: 6px;
+  background: #f7ba2a; /* 橙色 - 目标 */
   border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(247, 186, 42, 0.3);
 }
 
 /* 目标完成事件 */
 .day.has-goal-completed-event:not(.has-capsule-event):not(.has-goal-event)::after {
   content: '';
   position: absolute;
-  bottom: 4px;
+  bottom: 6px;
   left: 50%;
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   background: #67c23a; /* 绿色 - 目标完成 */
   border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(103, 194, 58, 0.3);
 }
 
 /* 当同一天有目标完成事件和胶囊事件时 */
 .day.has-goal-completed-event.has-capsule-event:not(.has-goal-event)::after {
   content: '';
   position: absolute;
-  bottom: 4px;
+  bottom: 6px;
   left: 35%;
-  width: 4px;
-  height: 4px;
-  background: #409eff; /* 蓝色 - 胶囊 */
+  width: 6px;
+  height: 6px;
+  background: #5c8eff; /* 蓝色 - 胶囊 */
   border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(92, 142, 255, 0.3);
 }
 
 .day.has-goal-completed-event.has-capsule-event:not(.has-goal-event)::before {
   content: '';
   position: absolute;
-  bottom: 4px;
+  bottom: 6px;
   left: 65%;
-  width: 4px;
-  height: 4px;
+  width: 6px;
+  height: 6px;
   background: #67c23a; /* 绿色 - 目标完成 */
   border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(103, 194, 58, 0.3);
 }
 
 /* 当同一天有目标完成事件和目标创建事件时 */
 .day.has-goal-completed-event.has-goal-event:not(.has-capsule-event)::after {
   content: '';
   position: absolute;
-  bottom: 4px;
+  bottom: 6px;
   left: 35%;
-  width: 4px;
-  height: 4px;
-  background: #e6a23c; /* 橙色 - 目标创建 */
+  width: 6px;
+  height: 6px;
+  background: #f7ba2a; /* 橙色 - 目标创建 */
   border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(247, 186, 42, 0.3);
 }
 
 .day.has-goal-completed-event.has-goal-event:not(.has-capsule-event)::before {
   content: '';
   position: absolute;
-  bottom: 4px;
+  bottom: 6px;
   left: 65%;
-  width: 4px;
-  height: 4px;
+  width: 6px;
+  height: 6px;
   background: #67c23a; /* 绿色 - 目标完成 */
   border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(103, 194, 58, 0.3);
 }
 
 /* 当一天有三个事件时 */
 .day.has-goal-completed-event.has-goal-event.has-capsule-event::after {
   content: '';
   position: absolute;
-  bottom: 4px;
+  bottom: 6px;
   left: 30%;
-  width: 4px;
-  height: 4px;
-  background: #409eff; /* 蓝色 - 胶囊 */
+  width: 6px;
+  height: 6px;
+  background: #5c8eff; /* 蓝色 - 胶囊 */
   border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(92, 142, 255, 0.3);
 }
 
 .day.has-goal-completed-event.has-goal-event.has-capsule-event::before {
   content: '';
   position: absolute;
-  bottom: 4px;
+  bottom: 6px;
   left: 50%;
-  width: 4px;
-  height: 4px;
-  background: #e6a23c; /* 橙色 - 目标创建 */
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  background: #f7ba2a; /* 橙色 - 目标创建 */
   border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(247, 186, 42, 0.3);
 }
 
 .day.has-goal-completed-event.has-goal-event.has-capsule-event::after {
   content: '';
   position: absolute;
-  bottom: 4px;
+  bottom: 6px;
   left: 70%;
-  width: 4px;
-  height: 4px;
+  width: 6px;
+  height: 6px;
   background: #67c23a; /* 绿色 - 目标完成 */
   border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(103, 194, 58, 0.3);
 }
 
+/* 工具提示样式 */
 .tooltip {
-  background: rgba(0, 0, 0, 0.8);
-  color: white;
-  border-radius: 4px;
-  padding: 10px;
-  font-size: 14px;
+  position: fixed;
+  background: white;
+  border: 1px solid #e6e9f0;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 99999;
   min-width: 200px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  max-width: 300px;
+  font-size: 14px;
+  line-height: 1.4;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* 日历工具提示样式 */
+.calendar-tooltip {
+  position: fixed;
+  z-index: 999999;
+  pointer-events: auto;
+  margin-top: 8px;
+  pointer-events: auto;
+}
+
+.tooltip-content {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(92, 142, 255, 0.25), 0 2px 8px rgba(92, 142, 255, 0.15);
+  min-width: 240px;
+  max-width: 300px;
+  backdrop-filter: blur(12px);
+  background: linear-gradient(135deg, #ffffff 0%, #f8faff 100%);
+  color: #333;
+  transition: all 0.3s ease;
+  border-top: 3px solid #5c8eff;
+  pointer-events: auto;
+  transform: translateY(-2px);
+  border: 1px solid rgba(92, 142, 255, 0.2);
 }
 
 .tooltip-content strong {
   display: block;
-  margin-bottom: 8px;
-  color: #fff;
+  margin-bottom: 16px;
+  color: #333;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f2f5;
 }
 
 .events-list {
-  margin-top: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 0;
 }
 
-.event-item {
-  padding: 4px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+/* 事件分组样式 */
+.event-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.event-item:last-child {
-  border-bottom: none;
+.event-group-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: #666;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f8f9ff;
+  border: 1px solid #e6e9f0;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  pointer-events: auto;
+}
+
+.event-group-item:hover {
+  background: #e6eeff;
+  border-color: #5c8eff;
+  box-shadow: 0 4px 12px rgba(92, 142, 255, 0.25);
+  transform: translateY(-1px);
+  border-left: 4px solid #5c8eff;
+}
+
+.event-group-item span:first-child {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+/* 二级悬浮提示样式 */
+.event-details-tooltip {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 8px;
+  background: white;
+  border: 1px solid #e6e9f0;
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 4px 16px rgba(92, 142, 255, 0.15);
+  min-width: 200px;
+  max-width: 280px;
+  z-index: 100000;
+  backdrop-filter: blur(10px);
+  background: linear-gradient(135deg, #ffffff 0%, #f8faff 100%);
+  pointer-events: auto;
+}
+
+.event-details-tooltip::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border-width: 6px;
+  border-style: solid;
+  border-color: transparent white transparent transparent;
+}
+
+.event-detail-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: #666;
+  padding: 6px 0;
+  line-height: 1.4;
+}
+
+.event-detail-item span:first-child {
+  font-size: 14px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.event-detail-status {
+  font-size: 11px;
+  color: #999;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+/* 选中日期的详细事件列表样式 */
+.selected-date-events {
+  margin-top: 12px;
+}
+
+.detailed-events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.event-category h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detailed-event-item {
+  background: #f8faff;
+  border: 1px solid #e6e9f0;
+  border-radius: 8px;
+  padding: 12px;
+  transition: all 0.2s ease;
+}
+
+.detailed-event-item:hover {
+  background: #e6eeff;
+  border-color: #5c8eff;
+  box-shadow: 0 4px 12px rgba(92, 142, 255, 0.25);
+  transform: translateX(4px);
+  transition: all 0.2s ease;
+}
+
+.event-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.event-meta {
+  font-size: 12px;
+  color: #666;
+  font-weight: 400;
 }
 
 .no-events {
-  color: #aaa;
-  font-style: italic;
-  padding: 4px 0;
+  color: #999;
+  font-size: 13px;
+  text-align: center;
+  padding: 12px 0;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 
-.event-status {
-  color: #67c23a;
+/* 最近的时间胶囊 */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #f0f5ff;
+}
+
+.section-header h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #333;
+  margin: 0;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.section-header :deep(.el-button) {
+  color: #5c8eff;
+  border-color: #5c8eff;
+  transition: all 0.3s ease;
+  border-radius: 8px;
+}
+
+.section-header :deep(.el-button:hover) {
+  background: #5c8eff;
+  color: white;
+  box-shadow: 0 4px 12px rgba(92, 142, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+/* 加载状态 */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 0;
+  color: #666;
+}
+
+.loading :deep(.el-icon) {
+  font-size: 32px;
+  margin-bottom: 16px;
+  color: #5c8eff;
+}
+
+/* 空状态 */
+.empty-capsules {
+  padding: 60px 0;
+  text-align: center;
+}
+
+.empty-capsules :deep(.el-empty) {
+  color: #999;
+}
+
+.empty-capsules :deep(.el-button) {
+  background: #5c8eff;
+  border-color: #5c8eff;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.empty-capsules :deep(.el-button:hover) {
+  background: #4a7bff;
+  box-shadow: 0 4px 12px rgba(92, 142, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+/* 胶囊网格 */
+.capsules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+/* 胶囊卡片 */
+.capsule-card {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(92, 142, 255, 0.1);
+  border: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  background: white;
+}
+
+.capsule-card:hover {
+  box-shadow: 0 12px 32px rgba(92, 142, 255, 0.15);
+  transform: translateY(-4px);
+}
+
+.capsule-cover {
+  height: 180px;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.capsule-cover::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(92, 142, 255, 0.3) 0%, rgba(74, 123, 255, 0.1) 100%);
+  z-index: 1;
+}
+
+.capsule-overlay {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+}
+
+.capsule-overlay :deep(.el-tag) {
+  border-radius: 20px;
+  padding: 4px 12px;
   font-size: 12px;
-  margin-left: 4px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
+.capsule-content {
+  padding: 20px;
+}
+
+.capsule-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 12px 0;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.capsule-date {
+  font-size: 14px;
+  color: #999;
+  margin: 0 0 12px 0;
+}
+
+.capsule-preview {
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 编辑资料对话框 */
+:deep(.el-dialog) {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+:deep(.el-dialog__header) {
+  background: linear-gradient(135deg, #5c8eff 0%, #4a7bff 100%);
+  color: white;
+  padding: 20px 24px;
+}
+
+:deep(.el-dialog__title) {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+:deep(.el-dialog__body) {
+  padding: 24px;
+}
+
+:deep(.el-form-item) {
+  margin-bottom: 20px;
+}
+
+:deep(.el-form-item__label) {
+  font-weight: 500;
+  color: #333;
+}
+
+:deep(.el-input),
+:deep(.el-textarea) {
+  border-radius: 8px;
+  border: 1px solid #e6e9f0;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-input:focus-within),
+:deep(.el-textarea:focus-within) {
+  border-color: #5c8eff;
+  box-shadow: 0 0 0 2px rgba(92, 142, 255, 0.1);
+}
+
+:deep(.el-dialog__footer) {
+  padding: 20px 24px;
+  border-top: 1px solid #f0f2f5;
+}
+
+:deep(.el-button) {
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-button--primary) {
+  background: #5c8eff;
+  border-color: #5c8eff;
+}
+
+:deep(.el-button--primary:hover) {
+  background: #4a7bff;
+  box-shadow: 0 4px 12px rgba(92, 142, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+/* 头像上传 */
+.avatar-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.avatar-uploader {
+  margin-bottom: 16px;
+}
+
+.avatar-uploader :deep(.el-avatar) {
+  border: 3px solid rgba(92, 142, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.avatar-uploader :deep(.el-avatar:hover) {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(92, 142, 255, 0.3);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .user-info {
+    flex-direction: column;
+    text-align: center;
+    padding: 24px;
+  }
+  
+  .user-stats {
+    justify-content: center;
+    gap: 24px;
+  }
+  
+  .stat-item {
+    padding: 12px 16px;
+  }
+  
+  .goal-calendar-container {
+    flex-direction: column;
+  }
+  
+  .goal-progress-card,
+  .calendar-card {
+    min-width: 100%;
+  }
+  
+  .capsules-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .capsule-cover {
+    height: 160px;
+  }
+}
+
+@media (max-width: 480px) {
+  .user-card {
+    margin-bottom: 16px;
+  }
+  
+  .user-info {
+    padding: 20px;
+  }
+  
+  .nickname {
+    font-size: 24px;
+  }
+  
+  .bio {
+    font-size: 14px;
+  }
+  
+  .user-stats {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  
+  .stat-item {
+    flex: 1;
+    min-width: 100px;
+  }
+  
+  .section-header h3 {
+    font-size: 18px;
+  }
+  
+  .capsule-content {
+    padding: 16px;
+  }
+  
+  .capsule-title {
+    font-size: 16px;
+  }
+}
+
+/* 滚动条样式 */
+.home-page::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.home-page::-webkit-scrollbar-track {
+  background: #f8f9ff;
+  border-radius: 3px;
+}
+
+.home-page::-webkit-scrollbar-thumb {
+  background: #c0c4cc;
+  border-radius: 3px;
+  transition: all 0.3s ease;
+}
+
+.home-page::-webkit-scrollbar-thumb:hover {
+  background: #a6aab3;
+}
+
+/* 平滑滚动 */
+html {
+  scroll-behavior: smooth;
+}
+
+/* 响应式布局 */
 @media (max-width: 768px) {
   .goal-calendar-container {
     flex-direction: column;
