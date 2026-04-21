@@ -9,7 +9,9 @@ import Timeline from '@/views/Timeline.vue'
 import Goals from '@/views/Goals.vue'
 import Achievements from '@/views/Achievements.vue'
 import CapsuleDetail from '@/views/CapsuleDetail.vue'
-import AiAssistant from '@/views/AiAssistant.vue'
+
+import EditProfile from '@/views/profile/EditProfile.vue'
+import ChangePassword from '@/views/profile/ChangePassword.vue'
 import UserManagement from '@/views/admin/UserManagement.vue'
 import Dashboard from '@/views/admin/Dashboard.vue'
 import CapsuleManagement from '@/views/admin/CapsuleManagement.vue'
@@ -46,18 +48,7 @@ const routes = [
     component: Goals,
     meta: { title: '我的目标' }
   },
-  {
-    path: '/achievements',
-    name: 'Achievements',
-    component: Achievements,
-    meta: { title: '成就徽章' }
-  },
-  {
-    path: '/ai-assistant',
-    name: 'AiAssistant',
-    component: AiAssistant,
-    meta: { title: '成长助手' }
-  },
+  { path: '/achievements', name: 'Achievements', component: Achievements, meta: { title: '成就徽章' } },
   {
     path: '/admin/users',
     name: 'UserManagement',
@@ -82,6 +73,18 @@ const routes = [
     component: CapsuleDetail,
     meta: { title: '时间胶囊详情' },
     props: true
+  },
+  {
+    path: '/profile/edit',
+    name: 'EditProfile',
+    component: EditProfile,
+    meta: { title: '编辑资料' }
+  },
+  {
+    path: '/profile/change-password',
+    name: 'ChangePassword',
+    component: ChangePassword,
+    meta: { title: '修改密码' }
   }
 ]
 

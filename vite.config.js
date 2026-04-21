@@ -9,12 +9,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
-      'vue': 'vue/dist/vue.esm-bundler.js',
-      '@wangeditor/editor-for-vue': '@wangeditor/editor-for-vue/dist/index.js'
+      'vue': 'vue/dist/vue.esm-bundler.js'
     }
-  },
-  optimizeDeps: {
-    include: ['@wangeditor/editor', '@wangeditor/editor-for-vue']
   },
   server: {
     proxy: {

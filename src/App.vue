@@ -54,10 +54,6 @@
                   <el-icon><Medal /></el-icon>
                   <span>{{ '成就徽章' }}</span>
                 </el-menu-item>
-                <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/ai-assistant">
-                  <el-icon><ChatLineRound /></el-icon>
-                  <span>{{ '成长助手' }}</span>
-                </el-menu-item>
                 <el-menu-item v-if="userInfo.role === 'ADMIN'" index="/admin/users">
                   <el-icon><Setting /></el-icon>
                   <span>{{ '用户管理' }}</span>
@@ -78,7 +74,7 @@
               <el-dropdown trigger="click" @command="handleNotificationCommand" style="margin-right: 20px;">
                 <span class="notification-icon">
                   <el-badge :value="unreadCount > 0 ? 1 : 0" :hidden="unreadCount === 0" class="item" :is-dot="true">
-                    <el-icon :size="20"><Message /></el-icon>
+                    <el-icon :size="20"><Bell /></el-icon>
                   </el-badge>
                 </span>
                 <template #dropdown>
@@ -120,6 +116,14 @@
                 </span>
                 <template #dropdown>
                   <el-dropdown-menu>
+                    <el-dropdown-item command="editProfile">
+                      <el-icon><Edit /></el-icon>
+                      编辑资料
+                    </el-dropdown-item>
+                    <el-dropdown-item command="changePassword">
+                      <el-icon><Lock /></el-icon>
+                      修改密码
+                    </el-dropdown-item>
                     <el-dropdown-item command="logout">
                       <el-icon><SwitchButton /></el-icon>
                       退出登录
@@ -161,10 +165,6 @@
               <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/achievements">
                 <el-icon><Medal /></el-icon>
                 <span>{{ '成就徽章' }}</span>
-              </el-menu-item>
-              <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/ai-assistant">
-                <el-icon><ChatLineRound /></el-icon>
-                <span>{{ '成长助手' }}</span>
               </el-menu-item>
               <el-menu-item v-if="userInfo.role === 'ADMIN'" index="/admin/users">
                 <el-icon><Setting /></el-icon>
@@ -220,7 +220,7 @@ import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 // import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { House, Edit, Timer, Trophy, Medal, User, ArrowDown, SwitchButton, ChatLineRound, Setting, Menu, DataLine, Collection, Message } from '@element-plus/icons-vue'
+import { House, Edit, Timer, Trophy, Medal, User, ArrowDown, SwitchButton, Setting, Menu, DataLine, Collection, Message, Notification, Bell } from '@element-plus/icons-vue'
 import wsService from '@/utils/websocket'
 import dayjs from 'dayjs'
 
@@ -444,7 +444,13 @@ const handleLogoutLocally = () => {
 }
 
 const handleCommand = (command) => {
-  if (command === 'logout') {
+  if (command === 'editProfile') {
+    // 导航到编辑资料页面
+    router.push('/profile/edit')
+  } else if (command === 'changePassword') {
+    // 导航到修改密码页面
+    router.push('/profile/change-password')
+  } else if (command === 'logout') {
     ElMessageBox.confirm('确定要退出登录吗？', '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',

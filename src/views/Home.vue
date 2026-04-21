@@ -82,23 +82,26 @@
           <el-col :xs="24" :md="16">
             <div class="recent-activities-section">
               <div class="section-header">
-                <h2>最近活动</h2>
+                <h2 class="section-title">最近活动</h2>
                 <div class="view-all-activities">
-                  <el-button type="text" @click="toggleShowAllActivities">查看全部历史</el-button>
+                  <el-button type="primary" size="small" @click="toggleShowAllActivities" style="color: white;">查看全部历史</el-button>
                 </div>
               </div>
               <div class="activities-list">
-                <div class="activity-item" v-for="(activity, index) in recentActivities" :key="index">
+                <div class="activity-card" v-for="(activity, index) in recentActivities" :key="index">
                   <div class="activity-icon">
-                    <el-icon v-if="activity.type === 'capsule' && activity.action === 'create'"><Plus /></el-icon>
-                    <el-icon v-else-if="activity.type === 'capsule' && activity.action === 'unlock'"><Lock /></el-icon>
-                    <el-icon v-else-if="activity.type === 'goal' && activity.action === 'update'"><Edit /></el-icon>
+                    <el-icon v-if="activity.type === 'capsule' && activity.action === 'create'" class="create-icon"><Plus /></el-icon>
+                    <el-icon v-else-if="activity.type === 'capsule' && activity.action === 'open'" class="open-icon">🔓</el-icon>
+                    <el-icon v-else-if="activity.type === 'goal' && (activity.action === 'update' || activity.action === 'complete')" class="complete-icon">✅</el-icon>
                   </div>
                   <div class="activity-content">
-                    <div class="activity-title">{{ activity.title }}</div>
-                    <div class="activity-description">{{ activity.description }}</div>
+                    <div class="activity-title">
+                      <span class="action-type">{{ getActionTypeText(activity.action) }}</span>
+                      <span class="activity-name">{{ activity.title || activity.content || '未命名内容' }}</span>
+                    </div>
+                    <div class="activity-description">{{ activity.description || '暂无活动描述' }}</div>
                   </div>
-                  <div class="activity-time">{{ activity.time }}</div>
+                  <div class="activity-time">{{ activity.time || getTimeAgo(activity.date || activity.createdAt || new Date().toISOString()) }}</div>
                 </div>
                 <div v-if="recentActivities.length === 0" class="empty-activities">
                   <el-empty description="暂无活动" />
@@ -328,6 +331,66 @@ export default {
   },
   
   methods: {
+    normalizeRecordList(responseData) {
+      if (!responseData) return [];
+      if (Array.isArray(responseData)) return responseData;
+      if (Array.isArray(responseData.records)) return responseData.records;
+      if (Array.isArray(responseData.list)) return responseData.list;
+      return [];
+    },
+    getCurrentUserId() {
+      const directUserId = localStorage.getItem('userId');
+      if (directUserId !== null && directUserId !== undefined && directUserId !== '') {
+        return String(directUserId);
+      }
+      try {
+        const userRaw = localStorage.getItem('user');
+        if (!userRaw) return null;
+        const user = JSON.parse(userRaw);
+        const userId = user?.id ?? user?.userId;
+        return userId === null || userId === undefined ? null : String(userId);
+      } catch (error) {
+        return null;
+      }
+    },
+    isCurrentUserCapsule(capsule, currentUserId) {
+      if (!capsule) return false;
+      if (currentUserId === null || currentUserId === undefined) return false;
+      const ownerId = capsule.userId ?? capsule.user_id ?? capsule.creatorId ?? capsule.creator_id;
+      // 对于已登录且接口天然按当前用户返回的场景，兼容后端未返回 owner 字段
+      if (ownerId === null || ownerId === undefined) return true;
+      return String(ownerId) === String(currentUserId);
+    },
+    isCurrentUserGoal(goal, currentUserId) {
+      if (!goal) return false;
+      if (currentUserId === null || currentUserId === undefined) return false;
+      const ownerId = goal.userId ?? goal.user_id ?? goal.creatorId ?? goal.creator_id ?? goal.ownerId ?? goal.owner_id;
+      // 对于 /goals 这类用户级接口，兼容无 owner 字段返回
+      if (ownerId === null || ownerId === undefined) return true;
+      return String(ownerId) === String(currentUserId);
+    },
+    normalizeActivityItem(activity) {
+      const rawType = String(activity?.type || '').toLowerCase();
+      const normalizedType = rawType.includes('goal') ? 'goal' : 'capsule';
+      const rawAction = String(activity?.action || '').toLowerCase();
+      const normalizedAction = rawType.includes('complete') || rawAction.includes('complete')
+        ? 'complete'
+        : (rawType.includes('open') || rawAction.includes('open') ? 'open' : 'create');
+      const itemTitle = activity?.content || activity?.title || activity?.name || '';
+      const actionText = normalizedType === 'goal'
+        ? (normalizedAction === 'complete' ? '完成了目标' : '创建了目标')
+        : (normalizedAction === 'open' ? '开启了胶囊' : '创建了胶囊');
+      const date = activity?.createdAt || activity?.date || activity?.time || new Date().toISOString();
+      return {
+        ...activity,
+        type: normalizedType,
+        action: normalizedAction,
+        title: itemTitle,
+        description: `${actionText}${itemTitle ? `：${itemTitle}` : ''}`,
+        date,
+        time: this.getTimeAgo(date)
+      };
+    },
     // 处理日期鼠标进入事件
     handleDayMouseEnter(event, day) {
       // 清除之前的定时器
@@ -601,12 +664,21 @@ export default {
         const axios = window.$axios || this.$axios;
         if (axios) {
           // 尝试从API获取最新的想法/胶囊数据
-          const response = await axios.get('/capsules/latest');
-          if (response?.data) {
-            this.flashbackData = response.data;
-            console.log('获取到时光闪回数据:', this.flashbackData);
-          } else {
-            // 如果没有API，尝试从本地胶囊数据中获取最新的一条
+          try {
+            // 暂时注释掉这个API调用，因为后端还没有实现
+            // const response = await axios.get('/api/capsules/latest');
+            // if (response?.data) {
+            //   this.flashbackData = response.data;
+            //   console.log('获取到时光闪回数据:', this.flashbackData);
+            // } else {
+            //   // 如果没有API，尝试从本地胶囊数据中获取最新的一条
+            //   this.getLocalFlashbackData();
+            // }
+            // 直接从本地数据获取
+            this.getLocalFlashbackData();
+          } catch (error) {
+            console.error('获取时光闪回数据失败:', error);
+            // 失败时尝试从本地数据获取
             this.getLocalFlashbackData();
           }
         } else {
@@ -674,6 +746,9 @@ export default {
           const response = await window.$axios.get('/users/profile');
           if (response?.code === 200 && response?.data) {
             const userData = response.data;
+            if (userData.id !== null && userData.id !== undefined) {
+              localStorage.setItem('userId', String(userData.id));
+            }
             this.userInfo = {
               nickname: userData.nickname || '时光旅行者',
               bio: userData.bio || '记录生活点滴，遇见更好的自己',
@@ -739,26 +814,34 @@ export default {
         this.loading = true
         // 确保axios可用
         const axios = window.$axios || this.$axios;
+        const currentUserId = this.getCurrentUserId();
         if (axios) {
           // 直接获取完整的时间胶囊列表
-          const capsulesResponse = await axios.get('/capsules');
-          if (capsulesResponse?.data?.content) {
-            this.capsules = capsulesResponse.data.content;
-            // 计算真正的胶囊数量（不包括目标数据）
-            this.capsuleCount = this.capsules.filter(item => {
-              return !item.type || item.type === 'capsule';
-            }).length;
-            console.log('使用capsules API数据:', capsulesResponse.data.content);
-            console.log('胶囊总数:', this.capsuleCount);
-          } else {
+          try {
+            const capsulesResponse = await axios.get('/capsules');
+            const capsuleRecords = this.normalizeRecordList(capsulesResponse?.data);
+            if (capsulesResponse?.code === 200 && capsuleRecords.length > 0) {
+              this.capsules = capsuleRecords.filter(item => this.isCurrentUserCapsule(item, currentUserId));
+              // 计算真正的胶囊数量（不包括目标数据）
+              this.capsuleCount = this.capsules.filter(item => {
+                return !item.type || item.type === 'capsule';
+              }).length;
+              console.log('使用capsules API数据（当前用户）:', this.capsules);
+              console.log('胶囊总数:', this.capsuleCount);
+            } else {
+              this.capsules = [];
+              this.capsuleCount = 0;
+            }
+          } catch (error) {
+            console.error('获取胶囊列表失败:', error);
             this.capsules = [];
             this.capsuleCount = 0;
           }
           
           // 单独获取统计信息
           try {
-            const statsResponse = await axios.get('/statistics');
-            if (statsResponse?.data) {
+            const statsResponse = await axios.get('/statistics/home');
+            if (statsResponse?.code === 200 && statsResponse?.data) {
               this.completedGoals = statsResponse.data.completedGoals || 0;
               this.achievements = statsResponse.data.achievements || 0;
               // 如果统计数据中有胶囊数量，使用它
@@ -786,15 +869,34 @@ export default {
           // 参考时间轴组件，使用timeline API获取胶囊数据
           try {
             const timelineResponse = await axios.get('/capsules/timeline');
-            if (timelineResponse?.data?.timeline) {
-              // 计算时间轴中的胶囊数量
-              let timelineCapsuleCount = 0;
+            if (timelineResponse?.code === 200 && timelineResponse?.data?.timeline) {
+              // 从时间轴数据中提取胶囊
+              const timelineCapsules = [];
               timelineResponse.data.timeline.forEach(yearData => {
-                timelineCapsuleCount += yearData.capsules.length;
+                yearData.capsules.forEach(capsule => {
+                  timelineCapsules.push({
+                    ...capsule,
+                    type: 'capsule'
+                  });
+                });
               });
-              // 使用时间轴API返回的胶囊数量
-              this.capsuleCount = timelineCapsuleCount;
-              console.log('从timeline API获取胶囊总数:', this.capsuleCount);
+              
+              // 过滤出当前用户的胶囊（首页只能看到自己的胶囊）
+              const userTimelineCapsules = timelineCapsules.filter(capsule =>
+                this.isCurrentUserCapsule(capsule, currentUserId)
+              );
+              
+              // 如果从capsules接口获取的数据为空，使用过滤后的时间轴API的数据
+              if (this.capsules.length === 0 && userTimelineCapsules.length > 0) {
+                this.capsules = userTimelineCapsules;
+                console.log('使用过滤后的timeline API的胶囊数据:', userTimelineCapsules);
+              }
+              
+              // 计算过滤后的胶囊数量
+              if (userTimelineCapsules.length > 0) {
+                this.capsuleCount = userTimelineCapsules.length;
+                console.log('从过滤后的timeline API获取胶囊总数:', this.capsuleCount);
+              }
             }
           } catch (timelineError) {
             console.error('获取时间轴数据失败:', timelineError);
@@ -804,21 +906,25 @@ export default {
           // 获取最近活动
           try {
             const activitiesResponse = await axios.get('/activities/recent', { params: { limit: 3 } });
-            if (activitiesResponse?.data?.content) {
-              this.recentActivities = activitiesResponse.data.content;
-            } else {
-              // 如果API失败，从本地数据生成最近活动
-              this.generateRecentActivities();
+            const activityRecords = this.normalizeRecordList(activitiesResponse?.data);
+            const currentUserActivities = (currentUserId === null || currentUserId === undefined)
+              ? activityRecords
+              : activityRecords.filter(item =>
+                this.isCurrentUserCapsule(item, currentUserId) || this.isCurrentUserGoal(item, currentUserId)
+              );
+            if (activitiesResponse?.code === 200 && currentUserActivities.length > 0) {
+              // 先保存接口活动，最终会与本地生成活动合并，避免只显示目标/只显示胶囊
+              this.allActivities = currentUserActivities.map(item => this.normalizeActivityItem(item));
+              console.log('从API获取最近活动（当前用户）:', currentUserActivities);
             }
           } catch (activitiesError) {
             console.error('获取最近活动失败:', activitiesError);
-            // 从本地数据生成最近活动
-            this.generateRecentActivities();
           }
           
-          // 获取存档健康度
+          // 获取存档健康度 - 暂时注释掉，因为后端还没有实现
+          /*
           try {
-            const storageResponse = await axios.get('/storage/usage');
+            const storageResponse = await axios.get('/api/storage/usage');
             if (storageResponse?.data) {
               this.storageUsage = storageResponse.data.usagePercentage || 0;
               this.lastSyncTime = storageResponse.data.lastSyncTime || '';
@@ -828,15 +934,19 @@ export default {
             this.storageUsage = 0;
             this.lastSyncTime = '';
           }
+          */
+          // 直接设置默认值
+          this.storageUsage = 0;
+          this.lastSyncTime = '';
           
           // 获取即将解锁的胶囊
           try {
             const upcomingResponse = await axios.get('/capsules/upcoming');
-            if (upcomingResponse?.data) {
+            if (upcomingResponse?.code === 200 && upcomingResponse?.data && this.isCurrentUserCapsule(upcomingResponse.data, currentUserId)) {
               this.upcomingCapsule = upcomingResponse.data;
               // 计算倒计时
-              if (this.upcomingCapsule?.openDate) {
-                this.calculateCountdown(this.upcomingCapsule.openDate);
+              if (this.upcomingCapsule?.openDate || this.upcomingCapsule?.open_date) {
+                this.calculateCountdown(this.upcomingCapsule.openDate || this.upcomingCapsule.open_date);
               }
               console.log('即将解锁的胶囊:', this.upcomingCapsule);
             } else {
@@ -851,11 +961,25 @@ export default {
           
           // 获取目标数据用于日历显示
           try {
-            // 移除分页限制，确保获取所有目标数据
-            const goalsResponse = await axios.get('/goals');
-            if (goalsResponse?.data?.content) {
+            // 取较大分页，并优先使用后端返回的全量统计值
+            const goalsResponse = await axios.get('/goals', { params: { page: 0, size: 1000 } });
+            const normalizedGoalRecords = this.normalizeRecordList(goalsResponse?.data);
+            const goalRecords = normalizedGoalRecords.length > 0
+              ? normalizedGoalRecords
+              : (Array.isArray(goalsResponse?.data?.goals) ? goalsResponse.data.goals : []);
+            const apiCompletedGoalCount = Number(goalsResponse?.data?.statistics?.completed);
+            if (Number.isFinite(apiCompletedGoalCount) && apiCompletedGoalCount >= 0) {
+              this.completedGoals = apiCompletedGoalCount;
+            }
+            if (Array.isArray(goalRecords)) {
               // 将目标数据添加到capsules数组中，以便在日历上显示
-              const goals = Array.isArray(goalsResponse.data.content) ? goalsResponse.data.content : [];
+              const goals = (currentUserId === null || currentUserId === undefined)
+                ? goalRecords
+                : goalRecords.filter(goal => this.isCurrentUserGoal(goal, currentUserId));
+              const completedGoalCount = goals.filter(goal => {
+                const status = (goal.status || '').toString().toUpperCase();
+                return status === 'COMPLETED';
+              }).length;
               
               // 创建目标事件数组
               let goalEvents = [];
@@ -877,7 +1001,9 @@ export default {
                 });
                 
                 // 如果目标已完成，添加目标完成事件
-                if ((goal.status === 'COMPLETED' || goal.status === 'completed') && goal.completedAt) {
+                const completedAt = goal.completedAt || goal.completed_at;
+                if (goal.status === 'COMPLETED' || goal.status === 'completed') {
+                  const completedDate = completedAt || goal.updatedAt || goal.updated_at || goal.date || goal.createdAt || goal.created_at || new Date().toISOString();
                   goalEvents.push({
                     ...goal,
                     id: `${goal.id}-completed`,
@@ -886,10 +1012,10 @@ export default {
                     title: `完成: ${goal.title}`,
                     description: `完成了目标: ${goal.title}`,
                     action: 'complete',
-                    time: this.getTimeAgo(goal.completedAt),
-                    date: goal.completedAt,
+                    time: this.getTimeAgo(completedDate),
+                    date: completedDate,
                     createdAt: goal.createdAt || goal.createTime || goal.created_at || new Date().toISOString(),
-                    completedAt: goal.completedAt,
+                    completedAt: completedDate,
                     originalId: goal.id
                   });
                 }
@@ -905,20 +1031,33 @@ export default {
               
               // 重新计算所有统计数据，确保数据同步
               // 计算已完成目标数
-              this.completedGoals = goalEvents.filter(item => {
-                return item.subtype === 'completed';
-              }).length;
+              if (!(Number.isFinite(apiCompletedGoalCount) && apiCompletedGoalCount >= 0)) {
+                this.completedGoals = completedGoalCount;
+              }
               
               // 重新查找即将解锁的胶囊
               this.findUpcomingCapsule();
               
-              // 重新生成最近活动，包含目标数据
+              // 重新生成最近活动，包含胶囊和目标，并与接口活动合并去重
               this.generateRecentActivities();
               
               console.log('重新计算后已完成目标数:', this.completedGoals);
+              console.log('合并目标数据后的capsules数组:', this.capsules);
+              console.log('重新生成的最近活动:', this.recentActivities);
             }
           } catch (goalsError) {
             console.error('获取目标数据失败:', goalsError);
+          }
+          // 首页统计统一以当前用户过滤后的本地数据为准，避免展示到其他用户口径
+          this.capsuleCount = this.capsules.filter(item => !item.type || item.type === 'capsule').length;
+          const localCompletedGoalCount = this.capsules.filter(item => {
+            if (item.type !== 'goal') return false;
+            const status = (item.status || '').toString().toUpperCase();
+            return item.subtype === 'completed' || status === 'COMPLETED';
+          }).length;
+          // 仅在还没有可信统计时才使用本地重算，避免覆盖后端全量统计
+          if (!Number.isFinite(this.completedGoals) || this.completedGoals < 0) {
+            this.completedGoals = Math.max(0, localCompletedGoalCount);
           }
         } else {
           // 如果没有axios，使用fetch
@@ -982,22 +1121,32 @@ export default {
       try {
         const axios = window.$axios || this.$axios;
         if (axios) {
-          // 尝试从API获取上月胶囊数量
-          const lastMonthResponse = await axios.get('/statistics/last-month');
-          if (lastMonthResponse?.data?.capsuleCount) {
-            const lastMonthCount = lastMonthResponse.data.capsuleCount;
-            if (lastMonthCount > 0) {
-              // 计算增长率
-              const growthRate = Math.round(((this.capsuleCount - lastMonthCount) / lastMonthCount) * 100);
-              this.capsuleGrowthRate = growthRate;
-              console.log('计算胶囊增长率:', growthRate);
+          // 尝试从API获取上月胶囊数量 - 暂时注释掉，因为后端还没有实现
+          /*
+          try {
+            const lastMonthResponse = await axios.get('/api/statistics/last-month');
+            if (lastMonthResponse?.data?.capsuleCount) {
+              const lastMonthCount = lastMonthResponse.data.capsuleCount;
+              if (lastMonthCount > 0) {
+                // 计算增长率
+                const growthRate = Math.round(((this.capsuleCount - lastMonthCount) / lastMonthCount) * 100);
+                this.capsuleGrowthRate = growthRate;
+                console.log('计算胶囊增长率:', growthRate);
+              } else {
+                this.capsuleGrowthRate = this.capsuleCount > 0 ? 100 : 0;
+              }
             } else {
-              this.capsuleGrowthRate = this.capsuleCount > 0 ? 100 : 0;
+              // 如果API失败，尝试从本地数据计算
+              this.estimateCapsuleGrowthRate();
             }
-          } else {
-            // 如果API失败，尝试从本地数据计算
+          } catch (error) {
+            console.error('计算胶囊增长率失败:', error);
+            // 尝试从本地数据估算
             this.estimateCapsuleGrowthRate();
           }
+          */
+          // 直接从本地数据估算
+          this.estimateCapsuleGrowthRate();
         } else {
           // 如果没有axios，尝试从本地数据估算
           this.estimateCapsuleGrowthRate();
@@ -1021,6 +1170,21 @@ export default {
       console.log('估算胶囊增长率:', this.capsuleGrowthRate);
     },
     
+    // 获取操作类型文本
+    getActionTypeText(action) {
+      switch (action) {
+        case 'create':
+          return '创建';
+        case 'open':
+          return '开启';
+        case 'update':
+        case 'complete':
+          return '完成';
+        default:
+          return '活动';
+      }
+    },
+    
     // 生成最近活动
     generateRecentActivities() {
       // 从capsules数组中提取最近活动
@@ -1029,6 +1193,7 @@ export default {
       // 添加胶囊创建活动
       this.capsules.forEach(capsule => {
         if (!capsule.type || capsule.type === 'capsule') {
+          // 添加胶囊创建活动
           activities.push({
             id: `capsule-${capsule.id}`,
             type: 'capsule',
@@ -1038,6 +1203,19 @@ export default {
             time: this.getTimeAgo(capsule.createdAt || capsule.created_at || capsule.date || new Date().toISOString()),
             date: capsule.createdAt || capsule.created_at || capsule.date || new Date().toISOString()
           });
+          
+          // 添加胶囊开启活动（如果胶囊已开启）
+          if (capsule.isOpened || capsule.status === 'OPENED') {
+            activities.push({
+              id: `capsule-${capsule.id}-opened`,
+              type: 'capsule',
+              action: 'open',
+              title: capsule.title,
+              description: `开启了胶囊: ${capsule.title}`,
+              time: this.getTimeAgo(capsule.openedAt || capsule.opened_at || capsule.createdAt || capsule.created_at || capsule.date || new Date().toISOString()),
+              date: capsule.openedAt || capsule.opened_at || capsule.createdAt || capsule.created_at || capsule.date || new Date().toISOString()
+            });
+          }
         }
       });
       
@@ -1068,20 +1246,45 @@ export default {
         }
       });
       
-      // 按时间排序
+      // 按时间排序（最新的在前面）
       activities.sort((a, b) => {
         return new Date(b.date) - new Date(a.date);
       });
       
-      // 存储所有活动
-      this.allActivities = activities;
-      // 取最近4个
-      this.recentActivities = activities.slice(0, 4);
+      // 过滤出半年内的活动
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      
+      const filteredActivities = activities.filter(activity => {
+        const activityDate = new Date(activity.date);
+        return activityDate >= sixMonthsAgo;
+      });
+      
+      // 保存所有半年内的活动
+      const apiActivities = Array.isArray(this.allActivities) ? this.allActivities : [];
+      const mergedActivities = [...apiActivities, ...filteredActivities];
+      const dedupActivities = [];
+      const seen = new Set();
+      mergedActivities.forEach(activity => {
+        const dedupKey = `${activity.type || 'unknown'}-${activity.action || 'unknown'}-${activity.id || activity.originalId || activity.title}-${activity.date || ''}`;
+        if (!seen.has(dedupKey)) {
+          seen.add(dedupKey);
+          dedupActivities.push(activity);
+        }
+      });
+      dedupActivities.sort((a, b) => new Date(b.date) - new Date(a.date));
+      this.allActivities = dedupActivities;
+      
+      // 只显示最近5个活动
+      this.recentActivities = dedupActivities.slice(0, 5);
     },
     
     // 查找即将解锁的胶囊
     findUpcomingCapsule() {
+      // 获取当前日期，设置为凌晨0点0分0秒
       const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      
       const upcomingCapsules = this.capsules.filter(capsule => {
         if (!capsule.type || capsule.type === 'capsule') {
           const openDate = capsule.openDate || capsule.open_date;
@@ -1090,7 +1293,9 @@ export default {
               const openDateTime = new Date(openDate);
               // 确保日期是有效的
               if (!isNaN(openDateTime.getTime())) {
-                return openDateTime > now;
+                // 只比较日期部分，不考虑时间部分
+                openDateTime.setHours(0, 0, 0, 0);
+                return openDateTime >= now;
               }
             } catch (e) {
               console.error('日期格式错误:', e);
@@ -1120,6 +1325,7 @@ export default {
         try {
           const axios = window.$axios || this.$axios;
           if (axios) {
+            const currentUserId = this.getCurrentUserId();
             axios.get('/capsules/timeline').then(response => {
               if (response?.data?.timeline) {
                 const timelineCapsules = [];
@@ -1129,8 +1335,12 @@ export default {
                     if (openDate) {
                       try {
                         const openDateTime = new Date(openDate);
-                        if (!isNaN(openDateTime.getTime()) && openDateTime > now) {
-                          timelineCapsules.push(capsule);
+                        if (!isNaN(openDateTime.getTime())) {
+                          // 只比较日期部分，不考虑时间部分
+                          openDateTime.setHours(0, 0, 0, 0);
+                          if (openDateTime >= now) {
+                            timelineCapsules.push(capsule);
+                          }
                         }
                       } catch (e) {
                         console.error('日期格式错误:', e);
@@ -1139,14 +1349,19 @@ export default {
                   });
                 });
                 
-                if (timelineCapsules.length > 0) {
-                  timelineCapsules.sort((a, b) => {
+                // 过滤出当前用户的胶囊（首页只能看到自己的胶囊）
+                const userTimelineCapsules = timelineCapsules.filter(capsule =>
+                  this.isCurrentUserCapsule(capsule, currentUserId)
+                );
+                
+                if (userTimelineCapsules.length > 0) {
+                  userTimelineCapsules.sort((a, b) => {
                     const dateA = new Date(a.openDate || a.open_date);
                     const dateB = new Date(b.openDate || b.open_date);
                     return dateA - dateB;
                   });
                   
-                  this.upcomingCapsule = timelineCapsules[0];
+                  this.upcomingCapsule = userTimelineCapsules[0];
                   console.log('从timeline API找到即将解锁的胶囊:', this.upcomingCapsule);
                   if (this.upcomingCapsule?.openDate || this.upcomingCapsule?.open_date) {
                     this.calculateCountdown(this.upcomingCapsule.openDate || this.upcomingCapsule.open_date);
@@ -1199,8 +1414,13 @@ export default {
     
     // 计算倒计时
     calculateCountdown(targetDate) {
+      // 获取当前时间
       const now = new Date();
+      
+      // 获取目标日期，设置为凌晨0点0分0秒
       const target = new Date(targetDate);
+      target.setHours(0, 0, 0, 0);
+      
       const diff = target - now;
       
       if (diff <= 0) {
@@ -1212,7 +1432,12 @@ export default {
       const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       
-      this.countdown = `${days}天 : ${hours.toString().padStart(2, '0')}小时 : ${minutes.toString().padStart(2, '0')}分钟`;
+      // 格式化为两位数
+      const formattedDays = days.toString().padStart(2, '0');
+      const formattedHours = hours.toString().padStart(2, '0');
+      const formattedMinutes = minutes.toString().padStart(2, '0');
+      
+      this.countdown = `${formattedDays}天 ${formattedHours}时 ${formattedMinutes}分`;
     },
     formatDate(date) {
       if (!date) return ''
@@ -1246,11 +1471,11 @@ export default {
     toggleShowAllActivities() {
       // 切换是否显示所有活动
       this.showAllActivities = !this.showAllActivities;
-      // 如果显示所有活动，使用allActivities，否则使用recentActivities
+      // 如果显示所有活动，使用allActivities（已过滤半年内的），否则只显示前5个
       if (this.showAllActivities) {
         this.recentActivities = this.allActivities;
       } else {
-        this.recentActivities = this.allActivities.slice(0, 4);
+        this.recentActivities = this.allActivities.slice(0, 5);
       }
     },
     async saveProfile() {
@@ -1363,11 +1588,11 @@ export default {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 60vh;
-  width: 100%;
+  height: 100vh;
+  width: 100vw;
   background: rgba(255, 255, 255, 0.8);
-  position: absolute;
-  top: 120px;
+  position: fixed;
+  top: 0;
   left: 0;
   z-index: 1000;
 }
@@ -1589,17 +1814,16 @@ export default {
   margin-bottom: 20px;
 }
 
-.section-header h2 {
-  font-size: 20px;
+.section-title {
+  font-size: 24px;
   font-weight: 700;
   color: #333;
   margin: 0;
   font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 
-.section-header :deep(.el-button) {
+.view-all-activities :deep(.el-button) {
   font-size: 14px;
-  color: #409EFF;
   font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 
@@ -1609,25 +1833,46 @@ export default {
   gap: 16px;
 }
 
-.activity-item {
+.activity-card {
   display: flex;
   align-items: flex-start;
   gap: 16px;
   padding: 16px;
-  background: #f8f9ff;
+  background: white;
+  border: 1px solid #e8e8e8;
   border-radius: 8px;
   transition: all 0.3s ease;
 }
 
-.activity-item:hover {
-  background: #e6f7ff;
-  box-shadow: 0 2px 8px rgba(92, 142, 255, 0.1);
+.activity-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: #409EFF;
 }
 
 .activity-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #f0f9ff;
+  flex-shrink: 0;
+}
+
+.create-icon {
   font-size: 20px;
   color: #409EFF;
-  margin-top: 2px;
+}
+
+.open-icon {
+  font-size: 20px;
+  color: #67C23A;
+}
+
+.complete-icon {
+  font-size: 20px;
+  color: #E6A23C;
 }
 
 .activity-content {
@@ -1640,11 +1885,22 @@ export default {
   color: #333;
   margin-bottom: 4px;
   font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-type {
+  font-weight: 700;
+}
+
+.activity-name {
+  font-weight: 700;
 }
 
 .activity-description {
-  font-size: 14px;
-  color: #666;
+  font-size: 12px;
+  color: #999;
   line-height: 1.4;
   font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
@@ -1655,6 +1911,7 @@ export default {
   white-space: nowrap;
   margin-top: 2px;
   font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  align-self: flex-start;
 }
 
 .empty-activities {

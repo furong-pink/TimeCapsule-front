@@ -261,6 +261,11 @@ const handleLogin = async () => {
                 role: userData.role
               }));
               
+              // 保存userId
+              if (userData.id) {
+                localStorage.setItem('userId', userData.id.toString());
+              }
+              
               // 保存token
               localStorage.setItem('token', token);
               
@@ -349,6 +354,11 @@ const saveUserDataAndRedirect = (userData, token) => {
     nickname: userData.nickname || (registerForm.nickname || registerForm.account),
     avatar: userData.avatar || ''
   }));
+  
+  // 保存userId
+  if (userData.id) {
+    localStorage.setItem('userId', userData.id.toString());
+  }
   
   // 保存token
   localStorage.setItem('token', token);

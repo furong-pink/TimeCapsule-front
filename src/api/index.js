@@ -4,10 +4,7 @@ import API_BASE_URL from './config';
 // 创建axios实例
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json'
-  }
+  timeout: 10000
 });
 
 // 请求拦截器
