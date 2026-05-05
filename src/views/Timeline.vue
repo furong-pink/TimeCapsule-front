@@ -148,7 +148,7 @@ export default {
     const loading = ref(false)
     const loadingMore = ref(false)
     const selectedCategory = ref('all')
-    const selectedYearRange = ref('5')
+    const selectedYearRange = ref('7d')
     const activities = ref([])
     const openingCapsules = ref({}) // 用于跟踪正在开启的胶囊
 
@@ -300,15 +300,20 @@ export default {
     const viewCapsule = (activity) => {
       // 跳转到胶囊详情页
       if (activity.id) {
-        // 检查胶囊是否已可开启（基于开启时间判断）
-        if (isDueToOpen(activity.openDate || activity.open_date)) {
+        // 优先检查胶囊是否已开启，如果已开启，直接跳转
+        if (activity.isOpened) {
           router.push(`/capsule/${activity.id}`);
         } else {
-          // 未开启，提示开启时间
-          const openDate = activity.openDate || activity.open_date;
-          const openDateStr = openDate ? formatDate(openDate) : '未来';
-          const message = `此时间胶囊将于 ${openDateStr} 开启`;
-          window.$message ? window.$message.info(message) : alert(message);
+          // 未开启，检查是否已到达开启日期
+          if (isDueToOpen(activity.openDate || activity.open_date)) {
+            router.push(`/capsule/${activity.id}`);
+          } else {
+            // 未到达开启日期，提示开启时间
+            const openDate = activity.openDate || activity.open_date;
+            const openDateStr = openDate ? formatDate(openDate) : '未来';
+            const message = `此时间胶囊将于 ${openDateStr} 开启`;
+            window.$message ? window.$message.info(message) : alert(message);
+          }
         }
       } else {
         console.error('时间胶囊ID不存在:', activity);
@@ -649,7 +654,7 @@ export default {
 /* 卡片图片容器 */
 .card-image-container {
   width: 100%;
-  height: 240px;
+  aspect-ratio: 16 / 9;
   position: relative;
   overflow: hidden;
   background-color: #f5f7fa;
@@ -692,6 +697,7 @@ export default {
   position: relative;
   border-radius: 8px 8px 0 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  aspect-ratio: 16 / 9;
 }
 
 .card-placeholder::before {
@@ -743,7 +749,7 @@ export default {
 .card-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   flex-wrap: wrap;
   gap: 12px;
 }

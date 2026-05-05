@@ -34,8 +34,6 @@
                 <div class="stat-info">
                   <div class="stat-label">胶囊总数</div>
                   <div class="stat-value">{{ capsuleCount }}</div>
-                  <div class="stat-change" v-if="capsuleGrowthRate !== null">{{ capsuleGrowthRate > 0 ? '+' : '' }}{{ capsuleGrowthRate }}% 较上月</div>
-                  <div class="stat-change" v-else>-- 较上月</div>
                 </div>
               </div>
             </el-card>
@@ -52,9 +50,7 @@
                     <div class="upcoming-type" v-if="upcomingCapsule.privacy">
                       类型：{{ (upcomingCapsule.privacy || '').toLowerCase() === 'public' ? '公开' : '私密' }}
                     </div>
-                    <div class="upcoming-description" v-if="upcomingCapsule.description || upcomingCapsule.content">
-                      {{ (upcomingCapsule.description || upcomingCapsule.content).length > 50 ? (upcomingCapsule.description || upcomingCapsule.content).substring(0, 50) + '...' : (upcomingCapsule.description || upcomingCapsule.content) }}
-                    </div>
+
                   </div>
                 </div>
                 <div v-else class="upcoming-description">暂无即将解锁的胶囊</div>
@@ -83,9 +79,6 @@
             <div class="recent-activities-section">
               <div class="section-header">
                 <h2 class="section-title">最近活动</h2>
-                <div class="view-all-activities">
-                  <el-button type="primary" size="small" @click="toggleShowAllActivities" style="color: white;">查看全部历史</el-button>
-                </div>
               </div>
               <div class="activities-list">
                 <div class="activity-card" v-for="(activity, index) in recentActivities" :key="index">
@@ -190,8 +183,7 @@ export default {
       recentActivities: [],
       // 所有活动数据
       allActivities: [],
-      // 是否显示所有活动
-      showAllActivities: false,
+
       // 时光闪回数据
       flashbackData: null,
       // 胶囊数量增长率
@@ -210,9 +202,28 @@ export default {
       isTooltipHovered: false,
       hideTooltipTimer: null,
       // 日期选择相关数据
-      selectedDate: null
+      selectedDate: null,
+      // 是否正在查询即将解锁的胶囊
+      isCheckingUpcoming: false,
+      // 上次查询API的时间戳
+      lastApiCheckTime: 0,
+      // 监控指标
+      monitoring: {
+        apiCalls: 0,
+        apiErrors: 0,
+        averageResponseTime: 0,
+        lastApiCallTime: 0
+      },
+      // 内存监控
+      memoryMonitor: {
+        currentUsage: 0,
+        peakUsage: 0,
+        warningThreshold: 80, // 内存使用警告阈值（百分比）
+        memoryCheckInterval: null
+      }
     }
   },
+
   
   computed: {
     recentCapsules() {
@@ -312,13 +323,23 @@ export default {
   },
   
   async mounted() {
-    console.log('Home组件挂载');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Home组件挂载');
+    }
     await this.loadUserInfo()
     this.fetchData()
     await this.fetchFlashbackData()
     
     // 监听localStorage变化，用于接收胶囊创建通知
     window.addEventListener('storage', this.handleStorageChange);
+    
+    // 设置定时器，每1分钟检查一次即将解锁的胶囊
+    this.checkUpcomingInterval = setInterval(() => {
+      this.findUpcomingCapsule();
+    }, 60000); // 60秒
+    
+    // 初始化内存监控
+    this.initMemoryMonitor();
   },
   
   beforeUnmount() {
@@ -328,6 +349,12 @@ export default {
     if (this.hideTooltipTimer) {
       clearTimeout(this.hideTooltipTimer);
     }
+    // 清除检查即将解锁胶囊的定时器
+    if (this.checkUpcomingInterval) {
+      clearInterval(this.checkUpcomingInterval);
+    }
+    // 停止内存监控
+    this.stopMemoryMonitor();
   },
   
   methods: {
@@ -903,6 +930,9 @@ export default {
             // 继续使用之前的胶囊数量
           }
           
+          // 生成最近活动
+          this.generateRecentActivities();
+          
           // 获取最近活动
           try {
             const activitiesResponse = await axios.get('/activities/recent', { params: { limit: 3 } });
@@ -920,6 +950,9 @@ export default {
           } catch (activitiesError) {
             console.error('获取最近活动失败:', activitiesError);
           }
+          
+          // 再次生成最近活动，确保合并API活动和本地活动
+          this.generateRecentActivities();
           
           // 获取存档健康度 - 暂时注释掉，因为后端还没有实现
           /*
@@ -1246,6 +1279,33 @@ export default {
         }
       });
       
+      // 如果没有活动，添加一些默认活动
+      if (activities.length === 0 && this.capsules.length === 0) {
+        const defaultActivities = [
+          {
+            id: 'default-1',
+            type: 'capsule',
+            action: 'create',
+            title: '欢迎使用时光胶囊',
+            description: '创建了第一个时光胶囊',
+            time: '刚刚',
+            date: new Date().toISOString()
+          },
+          {
+            id: 'default-2',
+            type: 'goal',
+            action: 'create',
+            title: '开始记录生活',
+            description: '创建了第一个目标',
+            time: '5分钟前',
+            date: new Date(Date.now() - 5 * 60 * 1000).toISOString()
+          }
+        ];
+        defaultActivities.forEach(activity => {
+          activities.push(activity);
+        });
+      }
+      
       // 按时间排序（最新的在前面）
       activities.sort((a, b) => {
         return new Date(b.date) - new Date(a.date);
@@ -1260,132 +1320,171 @@ export default {
         return activityDate >= sixMonthsAgo;
       });
       
-      // 保存所有半年内的活动
-      const apiActivities = Array.isArray(this.allActivities) ? this.allActivities : [];
-      const mergedActivities = [...apiActivities, ...filteredActivities];
-      const dedupActivities = [];
-      const seen = new Set();
-      mergedActivities.forEach(activity => {
-        const dedupKey = `${activity.type || 'unknown'}-${activity.action || 'unknown'}-${activity.id || activity.originalId || activity.title}-${activity.date || ''}`;
-        if (!seen.has(dedupKey)) {
-          seen.add(dedupKey);
-          dedupActivities.push(activity);
-        }
-      });
-      dedupActivities.sort((a, b) => new Date(b.date) - new Date(a.date));
-      this.allActivities = dedupActivities;
-      
       // 只显示最近5个活动
-      this.recentActivities = dedupActivities.slice(0, 5);
+      this.recentActivities = filteredActivities.slice(0, 5);
     },
     
     // 查找即将解锁的胶囊
     findUpcomingCapsule() {
-      // 获取当前日期，设置为凌晨0点0分0秒
-      const now = new Date();
-      now.setHours(0, 0, 0, 0);
+      // 如果正在查询，直接返回，避免重复请求
+      if (this.isCheckingUpcoming) {
+        return;
+      }
       
-      const upcomingCapsules = this.capsules.filter(capsule => {
+      // 检查是否在1分钟内已经查询过，避免频繁请求
+      const now = Date.now();
+      const oneMinute = 60 * 1000;
+      if (now - this.lastApiCheckTime < oneMinute) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('API查询过于频繁，跳过此次查询');
+        }
+        return;
+      }
+      
+      // 设置查询标志
+      this.isCheckingUpcoming = true;
+      // 更新上次查询时间
+      this.lastApiCheckTime = now;
+      
+      const currentUserId = this.getCurrentUserId();
+      
+      // 筛选条件：未开启、属于当前登录用户的胶囊
+      const eligibleCapsules = this.capsules.filter(capsule => {
+        // 只处理胶囊类型
         if (!capsule.type || capsule.type === 'capsule') {
-          const openDate = capsule.openDate || capsule.open_date;
-          if (openDate) {
-            try {
-              const openDateTime = new Date(openDate);
-              // 确保日期是有效的
-              if (!isNaN(openDateTime.getTime())) {
-                // 只比较日期部分，不考虑时间部分
-                openDateTime.setHours(0, 0, 0, 0);
-                return openDateTime >= now;
+          // 检查是否属于当前用户
+          if (this.isCurrentUserCapsule(capsule, currentUserId)) {
+            // 检查是否未开启
+            const isOpened = capsule.isOpened || capsule.status === 'OPENED';
+            if (!isOpened) {
+              // 检查是否有开放日期
+              const openDate = capsule.openDate || capsule.open_date;
+              if (openDate) {
+                try {
+                  const openDateTime = new Date(openDate);
+                  // 确保日期是有效的
+                  if (!isNaN(openDateTime.getTime())) {
+                    return true;
+                  }
+                } catch (e) {
+                  if (process.env.NODE_ENV === 'development') {
+                    console.error('日期格式错误:', e);
+                  }
+                }
               }
-            } catch (e) {
-              console.error('日期格式错误:', e);
             }
           }
         }
         return false;
       });
       
-      console.log('即将解锁的胶囊列表:', upcomingCapsules);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('符合条件的胶囊列表:', eligibleCapsules);
+      }
       
-      // 按解锁时间排序，取最近的一个
-      upcomingCapsules.sort((a, b) => {
-        const dateA = new Date(a.openDate || a.open_date);
-        const dateB = new Date(b.openDate || b.open_date);
-        return dateA - dateB;
+      // 按创建时间倒序排序（最新创建的排在最前面）
+      eligibleCapsules.sort((a, b) => {
+        const createDateA = new Date(a.createdAt || a.created_at || a.date || new Date(0));
+        const createDateB = new Date(b.createdAt || b.created_at || b.date || new Date(0));
+        return createDateB - createDateA; // 降序排序，最新的在前面
       });
       
-      if (upcomingCapsules.length > 0) {
-        this.upcomingCapsule = upcomingCapsules[0];
-        console.log('找到即将解锁的胶囊:', this.upcomingCapsule);
+      if (eligibleCapsules.length > 0) {
+        // 只展示最新创建的1条记录
+        this.upcomingCapsule = eligibleCapsules[0];
+        if (process.env.NODE_ENV === 'development') {
+          console.log('找到即将解锁的胶囊:', this.upcomingCapsule);
+        }
         if (this.upcomingCapsule?.openDate || this.upcomingCapsule?.open_date) {
           this.calculateCountdown(this.upcomingCapsule.openDate || this.upcomingCapsule.open_date);
         }
+        // 重置查询标志
+        this.isCheckingUpcoming = false;
       } else {
         // 尝试从timeline API数据中查找
         try {
           const axios = window.$axios || this.$axios;
           if (axios) {
-            const currentUserId = this.getCurrentUserId();
             axios.get('/capsules/timeline').then(response => {
               if (response?.data?.timeline) {
                 const timelineCapsules = [];
                 response.data.timeline.forEach(yearData => {
                   yearData.capsules.forEach(capsule => {
-                    const openDate = capsule.openDate || capsule.open_date;
-                    if (openDate) {
-                      try {
-                        const openDateTime = new Date(openDate);
-                        if (!isNaN(openDateTime.getTime())) {
-                          // 只比较日期部分，不考虑时间部分
-                          openDateTime.setHours(0, 0, 0, 0);
-                          if (openDateTime >= now) {
-                            timelineCapsules.push(capsule);
+                    // 检查是否属于当前用户
+                    if (this.isCurrentUserCapsule(capsule, currentUserId)) {
+                      // 检查是否未开启
+                      const isOpened = capsule.isOpened || capsule.status === 'OPENED';
+                      if (!isOpened) {
+                        // 检查是否有开放日期
+                        const openDate = capsule.openDate || capsule.open_date;
+                        if (openDate) {
+                          try {
+                            const openDateTime = new Date(openDate);
+                            if (!isNaN(openDateTime.getTime())) {
+                              timelineCapsules.push(capsule);
+                            }
+                          } catch (e) {
+                            if (process.env.NODE_ENV === 'development') {
+                              console.error('日期格式错误:', e);
+                            }
                           }
                         }
-                      } catch (e) {
-                        console.error('日期格式错误:', e);
                       }
                     }
                   });
                 });
                 
-                // 过滤出当前用户的胶囊（首页只能看到自己的胶囊）
-                const userTimelineCapsules = timelineCapsules.filter(capsule =>
-                  this.isCurrentUserCapsule(capsule, currentUserId)
-                );
+                // 按创建时间倒序排序（最新创建的排在最前面）
+                timelineCapsules.sort((a, b) => {
+                  const createDateA = new Date(a.createdAt || a.created_at || a.date || new Date(0));
+                  const createDateB = new Date(b.createdAt || b.created_at || b.date || new Date(0));
+                  return createDateB - createDateA; // 降序排序，最新的在前面
+                });
                 
-                if (userTimelineCapsules.length > 0) {
-                  userTimelineCapsules.sort((a, b) => {
-                    const dateA = new Date(a.openDate || a.open_date);
-                    const dateB = new Date(b.openDate || b.open_date);
-                    return dateA - dateB;
-                  });
-                  
-                  this.upcomingCapsule = userTimelineCapsules[0];
-                  console.log('从timeline API找到即将解锁的胶囊:', this.upcomingCapsule);
+                if (timelineCapsules.length > 0) {
+                  // 只展示最新创建的1条记录
+                  this.upcomingCapsule = timelineCapsules[0];
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('从timeline API找到即将解锁的胶囊:', this.upcomingCapsule);
+                  }
                   if (this.upcomingCapsule?.openDate || this.upcomingCapsule?.open_date) {
                     this.calculateCountdown(this.upcomingCapsule.openDate || this.upcomingCapsule.open_date);
                   }
                 } else {
                   this.upcomingCapsule = null;
                   this.countdown = '暂无即将解锁的胶囊';
-                  console.log('暂无即将解锁的胶囊');
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('暂无即将解锁的胶囊');
+                  }
                 }
               }
             }).catch(error => {
-              console.error('获取timeline数据失败:', error);
+              if (process.env.NODE_ENV === 'development') {
+                console.error('获取timeline数据失败:', error);
+              }
               this.upcomingCapsule = null;
               this.countdown = '暂无即将解锁的胶囊';
+            }).finally(() => {
+              // 重置查询标志
+              this.isCheckingUpcoming = false;
             });
           } else {
             this.upcomingCapsule = null;
             this.countdown = '暂无即将解锁的胶囊';
-            console.log('暂无即将解锁的胶囊');
+            if (process.env.NODE_ENV === 'development') {
+              console.log('暂无即将解锁的胶囊');
+            }
+            // 重置查询标志
+            this.isCheckingUpcoming = false;
           }
         } catch (error) {
-          console.error('查找即将解锁的胶囊失败:', error);
+          if (process.env.NODE_ENV === 'development') {
+            console.error('查找即将解锁的胶囊失败:', error);
+          }
           this.upcomingCapsule = null;
           this.countdown = '暂无即将解锁的胶囊';
+          // 重置查询标志
+          this.isCheckingUpcoming = false;
         }
       }
     },
@@ -1425,6 +1524,10 @@ export default {
       
       if (diff <= 0) {
         this.countdown = '已解锁';
+        // 当胶囊解锁时，延迟重新查找即将解锁的胶囊，避免循环调用
+        setTimeout(() => {
+          this.findUpcomingCapsule();
+        }, 1000);
         return;
       }
       
@@ -1464,20 +1567,8 @@ export default {
       // 跳转到胶囊详情或时间轴
       this.$router.push(`/timeline`)
     },
-    viewAllActivities() {
-      // 跳转到全部历史页面
-      this.$router.push(`/timeline`)
-    },
-    toggleShowAllActivities() {
-      // 切换是否显示所有活动
-      this.showAllActivities = !this.showAllActivities;
-      // 如果显示所有活动，使用allActivities（已过滤半年内的），否则只显示前5个
-      if (this.showAllActivities) {
-        this.recentActivities = this.allActivities;
-      } else {
-        this.recentActivities = this.allActivities.slice(0, 5);
-      }
-    },
+
+
     async saveProfile() {
       try {
         if (this.$axios) {
@@ -1560,12 +1651,74 @@ export default {
           return false
         }
       } catch (error) {
-        console.error('头像上传失败:', error)
+        if (process.env.NODE_ENV === 'development') {
+          console.error('头像上传失败:', error)
+        }
         ElMessage.error('头像上传失败: ' + (error.response?.data?.message || error.message))
         return false
       }
       
       return false // 阻止自动上传
+    },
+    
+    // 初始化内存监控
+    initMemoryMonitor() {
+      // 检查是否支持performance API
+      if (typeof performance !== 'undefined' && performance.memory) {
+        // 每30秒检查一次内存使用情况
+        this.memoryMonitor.memoryCheckInterval = setInterval(() => {
+          this.checkMemoryUsage();
+        }, 30000);
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('内存监控已初始化');
+        }
+      } else {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('当前环境不支持内存监控');
+        }
+      }
+    },
+    
+    // 停止内存监控
+    stopMemoryMonitor() {
+      if (this.memoryMonitor.memoryCheckInterval) {
+        clearInterval(this.memoryMonitor.memoryCheckInterval);
+        this.memoryMonitor.memoryCheckInterval = null;
+        if (process.env.NODE_ENV === 'development') {
+          console.log('内存监控已停止');
+        }
+      }
+    },
+    
+    // 检查内存使用情况
+    checkMemoryUsage() {
+      if (typeof performance !== 'undefined' && performance.memory) {
+        const memory = performance.memory;
+        const usedMemory = memory.usedJSHeapSize;
+        const totalMemory = memory.totalJSHeapSize;
+        const memoryUsagePercent = (usedMemory / totalMemory) * 100;
+        
+        this.memoryMonitor.currentUsage = memoryUsagePercent;
+        
+        // 更新峰值内存使用
+        if (memoryUsagePercent > this.memoryMonitor.peakUsage) {
+          this.memoryMonitor.peakUsage = memoryUsagePercent;
+        }
+        
+        // 内存使用警告
+        if (memoryUsagePercent > this.memoryMonitor.warningThreshold) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn(`内存使用警告: ${memoryUsagePercent.toFixed(2)}%`);
+            console.log(`已用内存: ${(usedMemory / 1024 / 1024).toFixed(2)}MB, 总内存: ${(totalMemory / 1024 / 1024).toFixed(2)}MB`);
+          }
+          // 可以在这里添加更多的处理逻辑，比如清理缓存等
+        }
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`内存使用: ${memoryUsagePercent.toFixed(2)}%, 已用: ${(usedMemory / 1024 / 1024).toFixed(2)}MB, 总: ${(totalMemory / 1024 / 1024).toFixed(2)}MB`);
+        }
+      }
     }
   }
 }

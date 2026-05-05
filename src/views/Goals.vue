@@ -1,155 +1,183 @@
 <template>
   <div class="goals">
-    <div class="goals-header">
-      <div>
-        <h2>我的目标</h2>
-        <p>设定和追踪你的个人目标</p>
-      </div>
-      <el-button type="primary" @click="showAddDialog = true">
-        <el-icon><Plus /></el-icon>
-        添加目标
-      </el-button>
-    </div>
-
-    <!-- 目标统计图表 -->
-    <el-row :gutter="20" class="stats-row">
-      <el-col :xs="24" :sm="12" :md="8">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-icon total">
-              <el-icon><Trophy /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ goals.length }}</div>
-              <div class="stat-label">总目标数</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :sm="12" :md="8">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-icon completed">
-              <el-icon><CircleCheck /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ completedCount }}</div>
-              <div class="stat-label">已完成</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :sm="12" :md="8">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-icon progress">
-              <el-icon><Clock /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ inProgressCount }}</div>
-              <div class="stat-label">进行中</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <!-- 进度图表 -->
-    <el-card class="chart-card" v-if="goals.length > 0">
-      <template #header>
-        <span>目标完成情况</span>
-      </template>
-      <div class="chart-container">
-        <div class="chart-item" v-for="goal in goals" :key="goal.id">
-          <div class="chart-label">{{ goal.title }}</div>
-          <el-progress 
-            :percentage="goal.progress" 
-            :status="goal.status === '已完成' ? 'success' : ''"
-            :stroke-width="10"
-            :format="() => `${goal.progress}%`"
-          />
+    <div class="container">
+      <!-- 顶部标题和按钮 -->
+      <div class="goals-header">
+        <div class="header-content">
+          <h2>我的目标</h2>
+          <p>通过时间轴追踪你的个人里程碑。每一刻都在这里被永恒记录。</p>
         </div>
+        <el-button type="primary" round @click="showAddDialog = true" class="create-button">
+          <el-icon><Plus /></el-icon>
+          创建新目标
+        </el-button>
       </div>
-    </el-card>
-    
-    <!-- 目标列表 -->
-    <div class="goal-list">
-      <el-card 
-        class="goal-card" 
-        v-for="goal in goals" 
-        :key="goal.id"
-        shadow="hover"
-      >
-        <template #header>
-          <div class="goal-header">
-            <div class="goal-title-section">
-              <el-icon class="goal-icon" :class="goal.type">
-                <Trophy v-if="goal.type === 'long-term'" />
-                <Flag v-else />
-              </el-icon>
-              <span class="goal-title">{{ goal.title }}</span>
+
+      <!-- 数据卡片区域 -->
+      <el-row :gutter="20" class="stats-row">
+        <!-- 总完成度卡片 -->
+        <el-col :xs="24" :sm="12" :md="6">
+          <el-card class="stat-card">
+            <div class="completion-content">
+              <div class="progress-ring">
+                <svg class="progress-svg" width="120" height="120" viewBox="0 0 120 120">
+                  <!-- 背景圆环 -->
+                  <circle
+                    class="progress-bg"
+                    cx="60"
+                    cy="60"
+                    r="50"
+                    stroke="#e5e5e5"
+                    stroke-width="8"
+                    fill="none"
+                  />
+                  <!-- 进度圆环 -->
+                  <circle
+                    class="progress-circle"
+                    cx="60"
+                    cy="60"
+                    r="50"
+                    stroke="#409EFF"
+                    stroke-width="8"
+                    fill="none"
+                    :stroke-dasharray="314.16"
+                    :stroke-dashoffset="314.16 - (314.16 * totalCompletion / 100)"
+                    stroke-linecap="round"
+                    transform="rotate(-90 60 60)"
+                  />
+                  <!-- 中心文字 -->
+                  <text x="60" y="55" class="progress-percent" text-anchor="middle">{{ totalCompletion }}%</text>
+                  <text x="60" y="75" class="progress-label" text-anchor="middle">总完成度</text>
+                </svg>
+              </div>
+              <h3 class="section-title">已完成进度</h3>
+              <p class="section-desc">您已完成 {{ goals.length }} 个目标中的 {{ completedCount }} 个</p>
             </div>
-            <div class="goal-actions">
-              <el-tag :type="getStatusType(goal.status)" size="small">
-                {{ goal.status }}
-              </el-tag>
-              <el-dropdown @command="handleCommand">
-                <el-button type="text" size="small">
-                  <el-icon><MoreFilled /></el-icon>
-                </el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item :command="{action: 'edit', goal}">编辑</el-dropdown-item>
-                    <el-dropdown-item :command="{action: 'delete', goal}">删除</el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+          </el-card>
+        </el-col>
+        <!-- 目标总数卡片 -->
+        <el-col :xs="24" :sm="12" :md="6">
+          <el-card class="stat-card">
+            <div class="stat-content">
+              <div class="stat-header blue-bg">
+                <el-icon class="stat-icon"><Folder /></el-icon>
+                <span class="stat-tag">总计</span>
+              </div>
+              <div class="stat-value">{{ goals.length }}</div>
+              <div class="stat-label">总目标数量</div>
             </div>
+          </el-card>
+        </el-col>
+        <!-- 已完成卡片 -->
+        <el-col :xs="24" :sm="12" :md="6">
+          <el-card class="stat-card">
+            <div class="stat-content">
+              <div class="stat-header green-bg">
+                <el-icon class="stat-icon"><Check /></el-icon>
+                <span class="stat-tag">已达成</span>
+              </div>
+              <div class="stat-value">{{ completedCount }}</div>
+              <div class="stat-label">已完成目标</div>
+            </div>
+          </el-card>
+        </el-col>
+        <!-- 进行中卡片 -->
+        <el-col :xs="24" :sm="12" :md="6">
+          <el-card class="stat-card">
+            <div class="stat-content">
+              <div class="stat-header orange-bg">
+                <el-icon class="stat-icon"><Timer /></el-icon>
+                <span class="stat-tag">进行中</span>
+              </div>
+              <div class="stat-value">{{ inProgressCount }}</div>
+              <div class="stat-label">待办中的目标</div>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+
+      <!-- 标签筛选栏 -->
+      <div class="filter-bar">
+        <el-tag 
+          :type="activeFilter === 'all' ? 'primary' : ''" 
+          :class="{ active: activeFilter === 'all' }"
+          @click="activeFilter = 'all'"
+        >
+          全部
+        </el-tag>
+        <el-tag 
+          :type="activeFilter === 'inProgress' ? 'primary' : ''" 
+          :class="{ active: activeFilter === 'inProgress' }"
+          @click="activeFilter = 'inProgress'"
+        >
+          进行中
+        </el-tag>
+        <el-tag 
+          :type="activeFilter === 'completed' ? 'primary' : ''" 
+          :class="{ active: activeFilter === 'completed' }"
+          @click="activeFilter = 'completed'"
+        >
+          已完成
+        </el-tag>
+      </div>
+
+      <!-- 目标卡片列表 -->
+      <div class="goal-list">
+        <el-card 
+          class="goal-card" 
+          v-for="goal in filteredGoals" 
+          :key="goal.id"
+          shadow="hover"
+          :body-style="{ padding: '20px' }"
+          :header="false"
+        >
+          <!-- 标题 -->
+          <h3 class="goal-title">{{ goal.title }}</h3>
+          
+          <!-- 分类标签 -->
+          <div class="goal-category">
+            {{ getCategoryName(goal.type) }}
           </div>
-        </template>
-        <div class="goal-content">
-          <p class="goal-description">{{ goal.description }}</p>
-          <div class="goal-meta">
-            <span class="goal-type">
-              <el-tag size="small" :type="goal.type === 'long-term' ? 'warning' : 'success'">
-                {{ goal.type === 'long-term' ? '长期目标' : '短期目标' }}
-              </el-tag>
-            </span>
-            <span class="goal-date">
-              <el-icon><Calendar /></el-icon>
-              期望完成：{{ formatDate(goal.targetDate) }}
-            </span>
-          </div>
+          
+          <!-- 进度条 -->
           <div class="progress-section">
             <div class="progress-header">
-              <span>完成进度</span>
-              <span class="progress-percent">{{ goal.progress }}%</span>
+              <span>当前进度</span>
+              <span :class="['progress-status', getStatusClass(goal)]">{{ getStatusText(goal) }}</span>
             </div>
             <el-progress 
               :percentage="goal.progress" 
-              :status="goal.status === '已完成' ? 'success' : ''"
-              :stroke-width="12"
+              :stroke-width="6"
+              :status="''"
             />
           </div>
-          <div class="goal-footer">
-            <el-switch
-              v-model="goal.enableReminder"
-              active-text="开启提醒"
-              inactive-text="关闭提醒"
-              @change="updateReminder(goal)"
-            />
-            <el-button 
-              type="text" 
-              size="small" 
-              @click="updateProgress(goal)"
-              v-if="goal.status === '进行中'"
-            >
-              更新进度
-            </el-button>
+          
+          <!-- 日期信息 -->
+          <div class="date-info">
+            <el-icon><Calendar /></el-icon>
+            <span v-if="goal.status === '已完成'">已完成: {{ formatDate(goal.completedDate || goal.targetDate) }}</span>
+            <span v-else-if="goal.targetDate">截止日期: {{ formatDate(goal.targetDate) }}</span>
+            <span v-else>待定日期</span>
           </div>
-        </div>
-      </el-card>
+          
+          <!-- 操作区 -->
+          <div class="goal-actions">
+            <a href="#" class="view-detail">查看详情</a>
+            <el-button size="small" class="update-plan" @click="updateProgress(goal)">更新计划</el-button>
+          </div>
+        </el-card>
+      </div>
+      
+      <!-- 空状态 -->
+      <div v-if="filteredGoals.length === 0" class="empty-state">
+        <el-empty description="暂无目标" />
+      </div>
     </div>
+
+    <!-- 悬浮添加按钮 -->
+    <el-button type="primary" round class="floating-btn" @click="showAddDialog = true">
+      <el-icon><Plus /></el-icon>
+    </el-button>
 
     <!-- 添加/编辑目标对话框 -->
     <el-dialog 
@@ -163,8 +191,8 @@
         </el-form-item>
         <el-form-item label="目标类型" prop="type">
           <el-radio-group v-model="goalForm.type">
-            <el-radio label="short-term">短期目标</el-radio>
-            <el-radio label="long-term">长期目标</el-radio>
+            <el-radio label="SHORT_TERM">短期目标</el-radio>
+            <el-radio label="LONG_TERM">长期目标</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="目标描述" prop="description">
@@ -187,9 +215,6 @@
         <el-form-item label="当前进度">
           <el-slider v-model="goalForm.progress" :max="100" show-input />
         </el-form-item>
-        <el-form-item label="开启提醒">
-          <el-switch v-model="goalForm.enableReminder" />
-        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showAddDialog = false">取消</el-button>
@@ -198,10 +223,27 @@
     </el-dialog>
 
     <!-- 更新进度对话框 -->
-    <el-dialog v-model="showProgressDialog" title="更新进度" width="400px">
-      <el-form :model="progressForm" label-width="80px">
+    <el-dialog v-model="showProgressDialog" title="更新计划" width="500px">
+      <el-form :model="progressForm" label-width="100px">
         <el-form-item label="完成进度">
           <el-slider v-model="progressForm.progress" :max="100" show-input />
+        </el-form-item>
+        <el-form-item label="截止日期">
+          <el-date-picker
+            v-model="progressForm.targetDate"
+            type="date"
+            placeholder="选择截止日期"
+            :disabled-date="disabledDate"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="此时感悟">
+          <el-input
+            v-model="progressForm.reflection"
+            type="textarea"
+            :rows="4"
+            placeholder="记录本次更新的感悟..."
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -215,7 +257,7 @@
 <script>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, CircleCheck, Clock, Trophy, MoreFilled, Calendar, Flag } from '@element-plus/icons-vue'
+import { Plus, CircleCheck, Clock, Trophy, MoreFilled, Calendar, Flag, Folder, Check, Timer, View, Histogram, Edit } from '@element-plus/icons-vue'
 
 export default {
   name: 'Goals',
@@ -226,7 +268,13 @@ export default {
     Trophy,
     Flag,
     MoreFilled,
-    Calendar
+    Calendar,
+    Folder,
+    Check,
+    Timer,
+    View,
+    Histogram,
+    Edit
   },
   setup() {
     const showAddDialog = ref(false)
@@ -234,6 +282,7 @@ export default {
     const editingGoal = ref(null)
     const goalFormRef = ref(null)
     const currentProgressGoal = ref(null)
+    const activeFilter = ref('all')
 
     const goals = ref([])
     
@@ -309,8 +358,9 @@ export default {
                   description: goal.description,
                   progress: goal.progress,
                   status: status,
-                  type: goal.type === 'LONG_TERM' ? 'long-term' : 'short-term',
+                  type: goal.type,
                   targetDate: goal.targetDate,
+                  completedDate: goal.completedDate,
                   enableReminder: goal.enableReminder
                 };
               });
@@ -345,14 +395,15 @@ export default {
     const goalForm = reactive({
       title: '',
       description: '',
-      type: 'short-term',
+      type: 'SHORT_TERM',
       targetDate: '',
-      progress: 0,
-      enableReminder: true
+      progress: 0
     })
 
     const progressForm = reactive({
-      progress: 0
+      progress: 0,
+      targetDate: '',
+      reflection: ''
     })
 
     const goalRules = {
@@ -378,8 +429,29 @@ export default {
       return goals.value.filter(g => g.status === '进行中').length
     })
 
+    const totalCompletion = computed(() => {
+      if (goals.value.length === 0) return 0;
+      const totalProgress = goals.value.reduce((sum, goal) => sum + goal.progress, 0);
+      return Math.round(totalProgress / goals.value.length);
+    })
+
+    const filteredGoals = computed(() => {
+      if (activeFilter.value === 'all') {
+        return goals.value;
+      } else if (activeFilter.value === 'completed') {
+        return goals.value.filter(g => g.status === '已完成');
+      } else if (activeFilter.value === 'inProgress') {
+        return goals.value.filter(g => g.status === '进行中');
+      }
+      return goals.value;
+    })
+
     const disabledDate = (time) => {
-      return time.getTime() < Date.now() - 8.64e7
+      // 获取当天的0点0分0秒
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      // 禁用当天之前的日期，只允许选择当天及之后的日期
+      return time.getTime() < today.getTime();
     }
 
     const getStatusType = (status) => {
@@ -408,6 +480,34 @@ export default {
       return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
     }
 
+    const getCategoryClass = (type) => {
+      switch (type) {
+        case 'LONG_TERM': return 'category-career';
+        case 'SHORT_TERM': return 'category-health';
+        default: return 'category-other';
+      }
+    }
+
+    const getCategoryName = (type) => {
+      switch (type) {
+        case 'LONG_TERM': return '长期目标';
+        case 'SHORT_TERM': return '短期目标';
+        default: return '其他';
+      }
+    }
+
+    const getGoalImage = (goal) => {
+      // 为不同类型的目标返回不同的默认图片，避免包含文字
+      switch (goal.type) {
+        case 'LONG_TERM':
+          return 'https://neeko-copilot.bytedance.net/api/text2image?prompt=abstract%20long%20term%20goals%20vision%20success%20planning%20no%20text&size=800x600&random=' + Math.random();
+        case 'SHORT_TERM':
+          return 'https://neeko-copilot.bytedance.net/api/text2image?prompt=abstract%20short%20term%20goals%20action%20progress%20no%20text&size=800x600&random=' + Math.random();
+        default:
+          return 'https://neeko-copilot.bytedance.net/api/text2image?prompt=abstract%20personal%20goals%20achievement%20success%20no%20text&size=800x600&random=' + Math.random();
+      }
+    }
+
     const handleCommand = ({ action, goal }) => {
       if (action === 'edit') {
         editingGoal.value = goal
@@ -416,8 +516,7 @@ export default {
           description: goal.description,
           type: goal.type,
           targetDate: goal.targetDate ? new Date(goal.targetDate) : null,
-          progress: goal.progress,
-          enableReminder: goal.enableReminder
+          progress: goal.progress
         })
         showAddDialog.value = true
       } else if (action === 'delete') {
@@ -486,10 +585,9 @@ export default {
                 const goalData = {
                   title: goalForm.title,
                   description: goalForm.description,
-                  type: goalForm.type === 'long-term' ? 'LONG_TERM' : 'SHORT_TERM',
+                  type: goalForm.type,
                   targetDate: goalForm.targetDate ? new Date(new Date(goalForm.targetDate).setHours(12, 0, 0, 0)).toISOString().split('T')[0] : null,
-                  progress: goalForm.progress,
-                  enableReminder: goalForm.enableReminder
+                  progress: goalForm.progress
                 };
                 
                 // 准备认证头信息
@@ -530,9 +628,9 @@ export default {
                         description: updatedGoal.description,
                         progress: updatedGoal.progress,
                         status: status,
-                        type: updatedGoal.type === 'LONG_TERM' ? 'long-term' : 'short-term',
+                        type: updatedGoal.type,
                         targetDate: updatedGoal.targetDate,
-                        enableReminder: updatedGoal.enableReminder
+                        completedDate: updatedGoal.completedDate
                       });
                     }
                     ElMessage.success('目标更新成功');
@@ -574,13 +672,18 @@ export default {
             try {
               if (window.$axios) {
                 // 使用API创建目标
+                // 映射前端类型到后端类型
+                let backendType = 'SHORT_TERM';
+                if (goalForm.type === 'career') {
+                  backendType = 'LONG_TERM';
+                }
+                
                 const goalData = {
                   title: goalForm.title,
                   description: goalForm.description,
-                  type: goalForm.type === 'long-term' ? 'LONG_TERM' : 'SHORT_TERM',
+                  type: backendType,
                   targetDate: goalForm.targetDate ? new Date(new Date(goalForm.targetDate).setHours(12, 0, 0, 0)).toISOString().split('T')[0] : null,
-                  progress: goalForm.progress,
-                  enableReminder: goalForm.enableReminder
+                  progress: goalForm.progress
                 };
                 
                 // 准备认证头信息
@@ -622,8 +725,9 @@ export default {
                         description: newGoal.description,
                         progress: newGoal.progress,
                         status: status,
-                        type: newGoal.type === 'LONG_TERM' ? 'long-term' : 'short-term',
+                        type: newGoal.type,
                         targetDate: newGoal.targetDate,
+                        completedDate: newGoal.completedDate,
                         enableReminder: newGoal.enableReminder
                       });
                     }
@@ -673,7 +777,7 @@ export default {
       Object.assign(goalForm, {
         title: '',
         description: '',
-        type: 'short-term',
+        type: 'career',
         targetDate: '',
         progress: 0,
         enableReminder: true
@@ -684,6 +788,8 @@ export default {
     const updateProgress = (goal) => {
       currentProgressGoal.value = goal
       progressForm.progress = goal.progress
+      progressForm.targetDate = goal.targetDate ? new Date(goal.targetDate) : ''
+      progressForm.reflection = ''
       showProgressDialog.value = true
     }
 
@@ -691,7 +797,7 @@ export default {
       if (currentProgressGoal.value) {
         try {
           if (window.$axios) {
-            console.log('Starting progress update...');
+            console.log('Starting goal update...');
             console.log('Axios instance:', window.$axios);
             
             // 准备认证头信息
@@ -704,16 +810,42 @@ export default {
             
             console.log('Headers:', headers);
             console.log('Progress form progress:', progressForm.progress);
+            console.log('Progress form targetDate:', progressForm.targetDate);
+            console.log('Progress form reflection:', progressForm.reflection);
             console.log('Current goal ID:', currentProgressGoal.value.id);
             
-            // 使用API更新目标进度
-            const response = await window.$axios.patch(`/goals/${currentProgressGoal.value.id}/progress`, {
-              progress: progressForm.progress
-            }, {
+            // 将前端显示状态转换为后端期望的英文状态值
+            const statusMap = {
+              '已完成': 'COMPLETED',
+              '进行中': 'IN_PROGRESS',
+              '已取消': 'CANCELLED'
+            };
+            
+            // 如果进度达到100%，自动将状态设置为已完成
+            let backendStatus = statusMap[currentProgressGoal.value.status] || 'IN_PROGRESS';
+            if (progressForm.progress >= 100) {
+              backendStatus = 'COMPLETED';
+            } else if (backendStatus === 'COMPLETED' && progressForm.progress < 100) {
+              // 如果进度低于100%但当前状态是已完成，改为进行中
+              backendStatus = 'IN_PROGRESS';
+            }
+            
+            // 构建更新目标对象
+            const updateGoalData = {
+              title: currentProgressGoal.value.title,
+              description: currentProgressGoal.value.description,
+              type: currentProgressGoal.value.type,
+              targetDate: progressForm.targetDate ? new Date(progressForm.targetDate).toISOString().split('T')[0] : null,
+              progress: progressForm.progress,
+              status: backendStatus
+            };
+            
+            // 使用API更新目标
+            const response = await window.$axios.put(`/goals/${currentProgressGoal.value.id}`, updateGoalData, {
               headers: headers
             });
             
-            console.log('Progress update response:', response);
+            console.log('Goal update response:', response);
 
             // 根据控制台输出，响应结构为：
             // response = {code: 200, message: '...', data: {目标对象}, timestamp: '...'}
@@ -733,7 +865,9 @@ export default {
               if (isSuccess) {
                 const updatedGoal = response.data;
                 if (updatedGoal) {
+                  // 更新本地目标数据
                   currentProgressGoal.value.progress = updatedGoal.progress;
+                  currentProgressGoal.value.targetDate = updatedGoal.targetDate;
                   // 根据后端返回的状态值更新显示状态
                   if (updatedGoal.status === 'COMPLETED' || updatedGoal.status === 'completed') {
                     currentProgressGoal.value.status = '已完成';
@@ -741,14 +875,20 @@ export default {
                     currentProgressGoal.value.status = '进行中';
                   } else if (updatedGoal.status === 'CANCELLED' || updatedGoal.status === 'cancelled') {
                     currentProgressGoal.value.status = '已取消';
+                  } else {
+                    // 默认设置为进行中
+                    currentProgressGoal.value.status = '进行中';
                   }
                   // 补充逻辑：如果进度达到100%，但状态还不是已完成，则更新为已完成
-                  else if (updatedGoal.progress >= 100 && currentProgressGoal.value.status !== '已完成') {
+                  if (updatedGoal.progress >= 100 && currentProgressGoal.value.status !== '已完成') {
                     currentProgressGoal.value.status = '已完成';
+                  } else if (updatedGoal.progress < 100 && currentProgressGoal.value.status === '已完成') {
+                    // 如果进度低于100%但状态是已完成，改为进行中
+                    currentProgressGoal.value.status = '进行中';
                   }
                 }
-                console.log('Progress update successful, showing success message');
-                ElMessage.success('进度更新成功');
+                console.log('Goal update successful, showing success message');
+                ElMessage.success('计划更新成功');
                 // 刷新目标列表以确保数据同步
                 console.log('Calling loadData to refresh data');
                 loadData();
@@ -756,7 +896,7 @@ export default {
               } else {
                 // 尝试从响应中获取错误信息
                 const errorMessage = response.message || response.msg || '更新失败';
-                console.log('Failed to update progress, showing error:', errorMessage);
+                console.log('Failed to update goal, showing error:', errorMessage);
                 ElMessage.error(errorMessage);
               }
             } else {
@@ -764,9 +904,20 @@ export default {
               console.log('Unexpected response format');
               ElMessage.error('更新失败: 响应格式异常');
             }
+          } else {
+            // 如果没有API，直接更新本地数据
+            currentProgressGoal.value.progress = progressForm.progress;
+            currentProgressGoal.value.targetDate = progressForm.targetDate;
+            // 更新状态
+            if (progressForm.progress >= 100) {
+              currentProgressGoal.value.status = '已完成';
+            } else if (currentProgressGoal.value.status === '已完成') {
+              currentProgressGoal.value.status = '进行中';
+            }
+            ElMessage.success('计划更新成功');
           }
         } catch (error) {
-          console.error('更新进度失败:', error);
+          console.error('更新计划失败:', error);
           console.error('Error details:', error.response || error.message || error);
               
           // 根据错误类型提供更准确的错误信息
@@ -852,6 +1003,44 @@ export default {
       }
     }
 
+    // 获取目标状态文本
+    const getStatusText = (goal) => {
+      if (goal.progress >= 100) {
+        return '已完成';
+      }
+      
+      if (goal.targetDate) {
+        const targetDate = new Date(goal.targetDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        if (targetDate < today) {
+          return '未完成';
+        }
+      }
+      
+      return '进行中';
+    }
+
+    // 获取目标状态样式类
+    const getStatusClass = (goal) => {
+      if (goal.progress >= 100) {
+        return 'status-completed';
+      }
+      
+      if (goal.targetDate) {
+        const targetDate = new Date(goal.targetDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        if (targetDate < today) {
+          return 'status-unfinished';
+        }
+      }
+      
+      return 'status-in-progress';
+    }
+
     return {
       showAddDialog,
       showProgressDialog,
@@ -863,15 +1052,23 @@ export default {
       goalRules,
       completedCount,
       inProgressCount,
+      totalCompletion,
+      activeFilter,
+      filteredGoals,
       disabledDate,
       getStatusType,
       formatDate,
+      getCategoryClass,
+      getCategoryName,
+      getGoalImage,
       handleCommand,
       saveGoal,
       resetForm,
       updateProgress,
       saveProgress,
-      updateReminder
+      updateReminder,
+      getStatusText,
+      getStatusClass
     }
   }
 }
@@ -883,210 +1080,278 @@ export default {
   margin: 0;
   width: 100%;
   min-height: calc(100vh - 120px);
+  background: linear-gradient(135deg, #f8f9ff 0%, #eef2ff 100%);
 }
 
+/* 状态样式 */
+.progress-status {
+  font-weight: bold;
+}
+
+.status-completed {
+  color: #67C23A;
+}
+
+.status-in-progress {
+  color: #E6A23C;
+}
+
+.status-unfinished {
+  color: #F56C6C;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+/* 顶部标题和按钮 */
 .goals-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 20px;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #f0f0f0;
 }
 
-h2 {
+.header-content h2 {
   color: #333;
-  font-size: 24px;
+  font-size: 32px;
   font-weight: 600;
-  margin: 0 0 8px 0;
+  margin: 0 0 12px 0;
 }
 
-p {
+.header-content p {
   color: #666;
-  font-size: 14px;
+  font-size: 16px;
   margin: 0;
+  line-height: 1.5;
 }
 
-/* 统计卡片 */
+.create-button {
+  font-size: 14px;
+  padding: 10px 20px;
+  border-radius: 25px;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.create-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
+}
+
+/* 数据卡片区域 */
 .stats-row {
-  margin-bottom: 20px;
+  margin-bottom: 30px;
 }
 
 .stat-card {
-  border-radius: 8px;
-}
-
-.stat-content {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.stat-icon {
-  width: 60px;
-  height: 60px;
   border-radius: 12px;
+  border: 1px solid #e8e8e8;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+/* 总完成度卡片 */
+/* 总完成度卡片 */
+.completion-content {
+  text-align: center;
+  padding: 24px 16px;
+  height: 240px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.progress-ring {
+  margin-bottom: 20px;
+}
+
+.progress-svg {
+  transition: all 0.3s ease;
+}
+
+.progress-circle {
+  transition: stroke-dashoffset 0.5s ease;
+}
+
+.progress-percent {
+  font-size: 24px;
+  font-weight: 700;
+  fill: #333;
+}
+
+.progress-label {
+  font-size: 14px;
+  fill: #666;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 8px 0;
+}
+
+.section-desc {
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+}
+
+/* 其他统计卡片 */
+.stat-content {
+  text-align: center;
+  padding: 24px 16px;
+  height: 240px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.stat-header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 28px;
-  color: white;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  margin-bottom: 20px;
 }
 
-.stat-icon.total {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.stat-header .stat-icon {
+  font-size: 16px;
+  color: #fff;
 }
 
-.stat-icon.completed {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+.stat-tag {
+  font-size: 12px;
+  font-weight: 500;
+  color: #fff;
 }
 
-.stat-icon.progress {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+.blue-bg {
+  background: rgba(64, 158, 255, 0.2);
 }
 
-.stat-info {
-  flex: 1;
+.blue-bg .stat-icon,
+.blue-bg .stat-tag {
+  color: #409EFF;
+}
+
+.green-bg {
+  background: rgba(103, 194, 58, 0.2);
+}
+
+.green-bg .stat-icon,
+.green-bg .stat-tag {
+  color: #67c23a;
+}
+
+.orange-bg {
+  background: rgba(230, 162, 60, 0.2);
+}
+
+.orange-bg .stat-icon,
+.orange-bg .stat-tag {
+  color: #e6a23c;
 }
 
 .stat-value {
-  font-size: 28px;
-  font-weight: 600;
+  font-size: 32px;
+  font-weight: 700;
   color: #333;
+  margin-bottom: 8px;
   line-height: 1;
-  margin-bottom: 4px;
 }
 
 .stat-label {
   font-size: 14px;
-  color: #999;
-}
-
-/* 图表卡片 */
-.chart-card {
-  margin-bottom: 15px;
-}
-
-.chart-container {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: 200px;
-  overflow-y: auto;
-  padding-right: 8px;
-}
-
-.chart-container::-webkit-scrollbar {
-  width: 4px;
-}
-
-.chart-container::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 2px;
-}
-
-.chart-container::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 2px;
-}
-
-.chart-container::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
-}
-
-.chart-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.chart-label {
-  font-size: 12px;
   color: #666;
-  margin-bottom: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-/* 目标列表 */
-.goal-list {
+/* 标签筛选栏 */
+.filter-bar {
   display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.goal-card {
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #ffffff;
   border-radius: 8px;
-  transition: transform 0.3s ease;
 }
 
-.goal-card:hover {
-  transform: translateY(-2px);
+.filter-bar .el-tag {
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
-.goal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.filter-bar .el-tag.active {
+  background: #409EFF;
+  color: white;
 }
 
-.goal-title-section {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-}
-
-.goal-icon {
-  font-size: 20px;
+.filter-bar .el-tag:not(.active):hover {
+  background: #ecf5ff;
   color: #409EFF;
 }
 
-.goal-icon.long-term {
-  color: #E6A23C;
+/* 目标卡片列表 */
+.goal-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+  margin-bottom: 80px;
 }
 
+.goal-card {
+  border-radius: 12px;
+  border: 1px solid #e8e8e8;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  overflow: hidden;
+  position: relative;
+}
+
+.goal-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* 分类标签 */
+.goal-category {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #f0f0f0;
+  color: #666;
+  margin-bottom: 16px;
+}
+
+/* 标题 */
 .goal-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: #333;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.goal-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.goal-content {
-  padding-top: 0;
-}
-
-.goal-description {
-  color: #666;
-  font-size: 14px;
-  line-height: 1.6;
   margin: 0 0 12px 0;
+  line-height: 1.4;
 }
 
-.goal-meta {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-
-.goal-date {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: #999;
-}
-
+/* 进度条 */
 .progress-section {
   margin-bottom: 16px;
 }
@@ -1105,11 +1370,119 @@ p {
   color: #409EFF;
 }
 
-.goal-footer {
+/* 日期信息 */
+.date-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: #666;
+}
+
+.date-info :deep(.el-icon) {
+  font-size: 16px;
+  color: #999;
+}
+
+/* 操作区 */
+.goal-actions {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 12px;
-  border-top: 1px solid #f0f0f0;
+  margin-top: 12px;
+}
+
+.view-detail {
+  font-size: 14px;
+  color: #409EFF;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.view-detail:hover {
+  color: #66b1ff;
+}
+
+.update-plan {
+  font-size: 14px;
+  color: #666;
+  border: 1px solid #dcdfe6;
+  border-radius: 20px;
+  padding: 4px 16px;
+  background: #ffffff;
+  transition: all 0.3s ease;
+}
+
+.update-plan:hover {
+  border-color: #c6e2ff;
+  color: #409EFF;
+}
+
+/* 悬浮添加按钮 */
+.floating-btn {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(64, 158, 255, 0.4);
+  transition: all 0.3s ease;
+  z-index: 100;
+}
+
+.floating-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(64, 158, 255, 0.5);
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin: 20px 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .container {
+    padding: 20px 16px;
+  }
+  
+  .goals-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .create-button {
+    align-self: flex-start;
+  }
+  
+  .goal-list {
+    grid-template-columns: 1fr;
+  }
+  
+  .filter-bar {
+    flex-wrap: wrap;
+  }
+  
+  .floating-btn {
+    bottom: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+  }
 }
 </style>

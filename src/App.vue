@@ -9,183 +9,210 @@
       
       <!-- 主应用页面：显示完整布局 -->
       <el-container v-else class="app-container">
-        <!-- 顶部栏 -->
-        <el-header class="app-header">
-          <div class="header-content">
-            <div class="header-left">
-              <div class="header-title">时光胶囊</div>
-              <!-- 移动端菜单按钮 -->
-              <el-button type="text" class="mobile-menu-btn" @click="mobileMenuOpen = !mobileMenuOpen" v-if="isLoggedIn">
-                <el-icon :size="20"><Menu /></el-icon>
-              </el-button>
+        <!-- 管理端布局 -->
+        <template v-if="isLoggedIn && userInfo.role === 'ADMIN'">
+          <!-- 管理端左侧侧边栏 -->
+          <el-aside class="admin-sidebar">
+            <div class="sidebar-header">
+              <div class="sidebar-title">时光胶囊</div>
+              <div class="sidebar-subtitle">管理后台</div>
             </div>
-            
-            <!-- 顶部导航菜单 -->
-            <div class="header-nav" v-if="isLoggedIn">
-              <el-menu
-                  :default-active="route.path"
-                  router
-                  mode="horizontal"
-                  background-color="transparent"
-                  text-color="rgba(255, 255, 255, 0.8)"
-                  active-text-color="#ffffff"
-                  :unique-opened="true"
-                  :collapse-transition="false"
-                  class="top-nav-menu"
-                  :ellipsis="false"
-                >
-                <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/">
-                  <el-icon><House /></el-icon>
-                  <span>{{ '首页' }}</span>
-                </el-menu-item>
-                <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/capsule/create">
-                  <el-icon><Edit /></el-icon>
-                  <span>{{ '创建胶囊' }}</span>
-                </el-menu-item>
-                <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/timeline">
-                  <el-icon><Timer /></el-icon>
-                  <span>{{ '时间轴' }}</span>
-                </el-menu-item>
-                <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/goals">
-                  <el-icon><Trophy /></el-icon>
-                  <span>{{ '我的目标' }}</span>
-                </el-menu-item>
-                <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/achievements">
-                  <el-icon><Medal /></el-icon>
-                  <span>{{ '成就徽章' }}</span>
-                </el-menu-item>
-                <el-menu-item v-if="userInfo.role === 'ADMIN'" index="/admin/users">
-                  <el-icon><Setting /></el-icon>
-                  <span>{{ '用户管理' }}</span>
-                </el-menu-item>
-                <el-menu-item v-if="userInfo.role === 'ADMIN'" index="/admin/dashboard">
-                  <el-icon><DataLine /></el-icon>
-                  <span>{{ '数据看板' }}</span>
-                </el-menu-item>
-                <el-menu-item v-if="userInfo.role === 'ADMIN'" index="/admin/capsules">
-                  <el-icon><Collection /></el-icon>
-                  <span>{{ '胶囊管理' }}</span>
-                </el-menu-item>
-              </el-menu>
-            </div>
-            
-            <div class="header-right" v-if="isLoggedIn">
-              <!-- 消息通知 -->
-              <el-dropdown trigger="click" @command="handleNotificationCommand" style="margin-right: 20px;">
-                <span class="notification-icon">
-                  <el-badge :value="unreadCount > 0 ? 1 : 0" :hidden="unreadCount === 0" class="item" :is-dot="true">
-                    <el-icon :size="20"><Bell /></el-icon>
-                  </el-badge>
-                </span>
-                <template #dropdown>
-                  <el-dropdown-menu class="notification-dropdown">
-                    <div class="notification-header">
-                      <span>{{ '消息通知' }}</span>
-                      <el-button link type="primary" size="small" @click="markAllRead">{{ '全部标记为已读' }}</el-button>
-                    </div>
-                    <div v-if="notifications.length === 0" class="no-notifications">
-                      {{ '暂无消息' }}
-                    </div>
-                    <div class="notification-list">
-                      <el-dropdown-item v-for="item in notifications" :key="item.id" :command="item" class="notification-item">
-                        <div class="notification-content">
-                          <div class="notification-header-row">
-                            <el-tag size="small" :type="item.type === 'APPROVAL' ? 'success' : 'danger'" class="notification-tag">
-                              {{ item.type === 'APPROVAL' ? '审核通过' : '审核拒绝' }}
-                            </el-tag>
-                            <span class="capsule-title" :title="'您的胶囊《' + item.content + '》'">您的胶囊《{{ item.content.length > 12 ? item.content.substring(0, 12) + '...' : item.content }}》</span>
-                          </div>
-                          <div class="notification-body">
-                            {{ item.type === 'APPROVAL' ? '恭喜您，您的胶囊审核通过' : '拒绝理由：' + item.reason }}
-                          </div>
-                          <div class="notification-time">{{ formatDate(item.createdAt) }}</div>
-                        </div>
-                      </el-dropdown-item>
-                    </div>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
-              
-              <el-dropdown @command="handleCommand" trigger="click" @visible-change="handleDropdownVisibleChange">
-                <span class="user-info" :class="{ 'dropdown-open': userMenuOpen }">
-                  <el-avatar :size="32" :src="userInfo.avatar" style="margin-right: 8px;">
-                    <el-icon><User /></el-icon>
-                  </el-avatar>
-                  <span class="username">{{ userInfo.nickname || '用户' }}</span>
-                  <el-icon class="dropdown-icon"><ArrowDown /></el-icon>
-                </span>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item command="editProfile">
-                      <el-icon><Edit /></el-icon>
-                      编辑资料
-                    </el-dropdown-item>
-                    <el-dropdown-item command="changePassword">
-                      <el-icon><Lock /></el-icon>
-                      修改密码
-                    </el-dropdown-item>
-                    <el-dropdown-item command="logout">
-                      <el-icon><SwitchButton /></el-icon>
-                      退出登录
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
-            </div>
-          </div>
-          
-          <!-- 移动端下拉菜单 -->
-          <div class="mobile-menu" v-if="isLoggedIn && mobileMenuOpen">
             <el-menu
               :default-active="route.path"
               router
-              background-color="#ffffff"
-              text-color="#333"
-              active-text-color="#409EFF"
+              mode="vertical"
+              background-color="#2d3748"
+              text-color="#a0aec0"
+              active-text-color="#ffffff"
               :unique-opened="true"
-              class="mobile-nav-menu"
-              @select="mobileMenuOpen = false"
+              class="admin-sidebar-menu"
             >
-              <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/">
-                <el-icon><House /></el-icon>
-                <span>{{ '首页' }}</span>
-              </el-menu-item>
-              <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/capsule/create">
-                <el-icon><Edit /></el-icon>
-                <span>{{ '创建胶囊' }}</span>
-              </el-menu-item>
-              <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/timeline">
-                <el-icon><Timer /></el-icon>
-                <span>{{ '时间轴' }}</span>
-              </el-menu-item>
-              <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/goals">
-                <el-icon><Trophy /></el-icon>
-                <span>{{ '我的目标' }}</span>
-              </el-menu-item>
-              <el-menu-item v-if="userInfo.role !== 'ADMIN'" index="/achievements">
-                <el-icon><Medal /></el-icon>
-                <span>{{ '成就徽章' }}</span>
-              </el-menu-item>
-              <el-menu-item v-if="userInfo.role === 'ADMIN'" index="/admin/users">
+              <el-menu-item index="/admin/users">
                 <el-icon><Setting /></el-icon>
                 <span>{{ '用户管理' }}</span>
               </el-menu-item>
-              <el-menu-item v-if="userInfo.role === 'ADMIN'" index="/admin/dashboard">
+              <el-menu-item index="/admin/dashboard">
                 <el-icon><DataLine /></el-icon>
                 <span>{{ '数据看板' }}</span>
               </el-menu-item>
-              <el-menu-item v-if="userInfo.role === 'ADMIN'" index="/admin/capsules">
+              <el-menu-item index="/admin/capsules">
                 <el-icon><Collection /></el-icon>
                 <span>{{ '胶囊管理' }}</span>
               </el-menu-item>
             </el-menu>
-          </div>
-        </el-header>
+            
+            <!-- 退出登录按钮 -->
+            <div class="sidebar-footer">
+              <el-button type="text" class="logout-btn" @click="handleAdminLogout">
+                <el-icon><SwitchButton /></el-icon>
+                <span>退出登录</span>
+              </el-button>
+            </div>
+          </el-aside>
+          
+          <!-- 管理端主内容区域 -->
+          <el-main class="admin-main">
+            <router-view :key="route.fullPath" />
+          </el-main>
+        </template>
+        
+        <!-- 用户端布局 -->
+        <template v-else>
+          <el-container class="main-container">
+            <el-header class="app-header">
+              <div class="header-content">
+                <div class="header-left">
+                  <div class="header-title">时光胶囊</div>
+                  <!-- 移动端菜单按钮 -->
+                  <el-button type="text" class="mobile-menu-btn" @click="mobileMenuOpen = !mobileMenuOpen" v-if="isLoggedIn">
+                    <el-icon :size="20"><Menu /></el-icon>
+                  </el-button>
+                </div>
+                
+                <!-- 顶部导航菜单 -->
+                <div class="header-nav" v-if="isLoggedIn">
+                  <el-menu
+                      :default-active="route.path"
+                      router
+                      mode="horizontal"
+                      background-color="transparent"
+                      text-color="rgba(255, 255, 255, 0.8)"
+                      active-text-color="#ffffff"
+                      :unique-opened="true"
+                      :collapse-transition="false"
+                      class="top-nav-menu"
+                      :ellipsis="false"
+                    >
+                    <el-menu-item index="/">
+                      <el-icon><House /></el-icon>
+                      <span>{{ '首页' }}</span>
+                    </el-menu-item>
+                    <el-menu-item index="/capsule/create">
+                      <el-icon><Edit /></el-icon>
+                      <span>{{ '创建胶囊' }}</span>
+                    </el-menu-item>
+                    <el-menu-item index="/timeline">
+                      <el-icon><Timer /></el-icon>
+                      <span>{{ '时间轴' }}</span>
+                    </el-menu-item>
+                    <el-menu-item index="/goals">
+                      <el-icon><Trophy /></el-icon>
+                      <span>{{ '我的目标' }}</span>
+                    </el-menu-item>
+                    <el-menu-item index="/achievements">
+                      <el-icon><Medal /></el-icon>
+                      <span>{{ '成就徽章' }}</span>
+                    </el-menu-item>
+                  </el-menu>
+                </div>
+                
+                <div class="header-right" v-if="isLoggedIn">
+                <!-- 消息通知 -->
+                <el-dropdown trigger="click" @command="handleNotificationCommand" style="margin-right: 20px;">
+                  <span class="notification-icon">
+                    <el-badge :value="unreadCount > 0 ? 1 : 0" :hidden="unreadCount === 0" class="item" :is-dot="true">
+                      <el-icon :size="20"><Bell /></el-icon>
+                    </el-badge>
+                  </span>
+                  <template #dropdown>
+                    <el-dropdown-menu class="notification-dropdown">
+                      <div class="notification-header">
+                        <span>{{ '消息通知' }}</span>
+                        <el-button link type="primary" size="small" @click="markAllRead">{{ '全部标记为已读' }}</el-button>
+                      </div>
+                      <div v-if="notifications.length === 0" class="no-notifications">
+                        {{ '暂无消息' }}
+                      </div>
+                      <div class="notification-list">
+                        <el-dropdown-item v-for="item in notifications" :key="item.id" :command="item" class="notification-item">
+                          <div class="notification-content">
+                            <div class="notification-header-row">
+                              <el-tag size="small" :type="item.type === 'APPROVAL' ? 'success' : 'danger'" class="notification-tag">
+                                {{ item.type === 'APPROVAL' ? '审核通过' : '审核拒绝' }}
+                              </el-tag>
+                              <span class="capsule-title" :title="'您的胶囊《' + item.content + '》'">您的胶囊《{{ item.content.length > 12 ? item.content.substring(0, 12) + '...' : item.content }}》</span>
+                            </div>
+                            <div class="notification-body">
+                              {{ item.type === 'APPROVAL' ? '恭喜您，您的胶囊审核通过' : '拒绝理由：' + item.reason }}
+                            </div>
+                            <div class="notification-time">{{ formatDate(item.createdAt) }}</div>
+                          </div>
+                        </el-dropdown-item>
+                      </div>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
+                
+                <el-dropdown @command="handleCommand" trigger="click" @visible-change="handleDropdownVisibleChange">
+                  <span class="user-info" :class="{ 'dropdown-open': userMenuOpen }">
+                    <el-avatar :size="32" :src="userInfo.avatar" style="margin-right: 8px;">
+                      <el-icon><User /></el-icon>
+                    </el-avatar>
+                    <span class="username">{{ userInfo.nickname || '用户' }}</span>
+                    <el-icon class="dropdown-icon"><ArrowDown /></el-icon>
+                  </span>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item command="editProfile">
+                        <el-icon><Edit /></el-icon>
+                        编辑资料
+                      </el-dropdown-item>
+                      <el-dropdown-item command="changePassword">
+                        <el-icon><Lock /></el-icon>
+                        修改密码
+                      </el-dropdown-item>
+                      <el-dropdown-item command="logout">
+                        <el-icon><SwitchButton /></el-icon>
+                        退出登录
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
+              </div>
+            </div>
+            
+            <!-- 移动端下拉菜单 -->
+            <div class="mobile-menu" v-if="isLoggedIn && mobileMenuOpen">
+              <el-menu
+                :default-active="route.path"
+                router
+                background-color="#ffffff"
+                text-color="#333"
+                active-text-color="#409EFF"
+                :unique-opened="true"
+                class="mobile-nav-menu"
+                @select="mobileMenuOpen = false"
+              >
+                <el-menu-item index="/">
+                  <el-icon><House /></el-icon>
+                  <span>{{ '首页' }}</span>
+                </el-menu-item>
+                <el-menu-item index="/capsule/create">
+                  <el-icon><Edit /></el-icon>
+                  <span>{{ '创建胶囊' }}</span>
+                </el-menu-item>
+                <el-menu-item index="/timeline">
+                  <el-icon><Timer /></el-icon>
+                  <span>{{ '时间轴' }}</span>
+                </el-menu-item>
+                <el-menu-item index="/goals">
+                  <el-icon><Trophy /></el-icon>
+                  <span>{{ '我的目标' }}</span>
+                </el-menu-item>
+                <el-menu-item index="/achievements">
+                  <el-icon><Medal /></el-icon>
+                  <span>{{ '成就徽章' }}</span>
+                </el-menu-item>
+              </el-menu>
+            </div>
+          </el-header>
 
-        <!-- 主内容区域 -->
-        <el-main class="app-main">
-          <router-view :key="route.fullPath" />
-        </el-main>
+          <!-- 主内容区域 -->
+          <el-main class="app-main">
+            <router-view :key="route.fullPath" />
+          </el-main>
+        </el-container>
+      </template>
       </el-container>
 
       <!-- 全局加载遮罩：不卸载 DOM，只做视觉遮盖 -->
@@ -443,6 +470,22 @@ const handleLogoutLocally = () => {
   loggedIn.value = false
 }
 
+const handleAdminLogout = () => {
+  ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(() => {
+    localStorage.removeItem('user')
+    localStorage.removeItem('token')
+    userInfo.value = { id: null, nickname: '', avatar: '', role: 'USER' }
+    loggedIn.value = false
+    wsService.disconnect()
+    ElMessage.success('已退出登录')
+    router.push('/login')
+  }).catch(() => {})
+}
+
 const handleCommand = (command) => {
   if (command === 'editProfile') {
     // 导航到编辑资料页面
@@ -521,9 +564,117 @@ onUnmounted(() => {
 .app-container {
   height: 100vh;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   margin: 0;
   padding: 0;
+}
+
+/* 主容器（包含顶部栏和内容区） */
+.main-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* 管理端侧边栏 */
+.admin-sidebar {
+  width: 220px;
+  background-color: #2d3748;
+  color: #a0aec0;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  z-index: 200;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.15);
+}
+
+.sidebar-header {
+  padding: 24px 20px;
+  border-bottom: 1px solid #4a5568;
+  background: linear-gradient(180deg, #4a5568 0%, #2d3748 100%);
+}
+
+.sidebar-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 4px;
+}
+
+.sidebar-subtitle {
+  font-size: 12px;
+  color: #718096;
+}
+
+.admin-sidebar-menu {
+  flex: 1;
+  border-right: none !important;
+  padding-top: 15px;
+}
+
+.admin-sidebar-menu .el-menu-item {
+  color: #a0aec0;
+  height: 48px;
+  line-height: 48px;
+  padding: 0 20px !important;
+  margin: 4px 10px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.admin-sidebar-menu .el-menu-item:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff;
+}
+
+.admin-sidebar-menu .el-menu-item.is-active {
+  background-color: #4a7bff !important;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.admin-sidebar-menu .el-menu-item .el-icon {
+  margin-right: 12px;
+  font-size: 18px;
+}
+
+/* 管理端主内容区 */
+.admin-main {
+  flex: 1;
+  background-color: #f8f9ff;
+  margin: 0;
+  padding: 24px;
+  min-height: 100vh;
+  background-image: linear-gradient(135deg, #f8f9ff 0%, #eef2ff 100%);
+  margin-left: 220px;
+}
+
+/* 侧边栏底部 */
+.sidebar-footer {
+  padding: 20px;
+  border-top: 1px solid #4a5568;
+  margin-top: auto;
+}
+
+.logout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a0aec0 !important;
+  background-color: transparent !important;
+  border-radius: 8px;
+  padding: 12px 20px;
+  transition: all 0.3s ease;
+}
+
+.logout-btn:hover {
+  background-color: rgba(239, 68, 68, 0.2) !important;
+  color: #ef4444 !important;
 }
 
 /* 全局加载遮罩 */

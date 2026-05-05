@@ -124,7 +124,7 @@
                   </div>
                   <div v-else class="upload-placeholder">
                     <el-icon class="upload-icon"><Plus /></el-icon>
-                    <p>点击或拖拽图片到此处，最大支持5MB</p>
+                    <p>点击或拖拽图片到此处，单张最大支持2MB</p>
                     <p class="upload-hint">最多上传3张图片</p>
                   </div>
                 </div>
@@ -160,19 +160,47 @@
           <!-- 胶囊预览 -->
           <el-card class="preview-card">
             <div class="preview-content">
+              <!-- 顶部标题 -->
               <div class="preview-header">
-                <h3>胶囊预览</h3>
+                <el-icon class="eye-icon"><View /></el-icon>
+                <h3>实时预览</h3>
               </div>
-              <div class="preview-body">
-                <div class="preview-title">{{ form.title || '此处将显示你的标题' }}</div>
-                <div class="preview-description">{{ form.content ? form.content.substring(0, 100) + (form.content.length > 100 ? '...' : '') : '在这里预览你的记忆内容，胶囊一旦封存，在开启时间到来之前将无法再次查看。' }}</div>
-                <div class="preview-date" v-if="form.openDate">
-                  开启时间: {{ formatDate(form.openDate) }}
+              
+              <!-- 封面预览区域 -->
+              <div class="cover-preview">
+                <div class="cover-placeholder" v-if="form.coverImages.length === 0">
+                  <el-icon class="cover-icon"><Picture /></el-icon>
+                  <p>封面预览</p>
                 </div>
-                <div class="preview-date" v-else>
-                  开启时间: 未设置
+                <img v-else :src="form.coverImages[0].url" alt="封面预览" class="cover-image">
+              </div>
+              
+              <!-- 标题与内容区 -->
+              <div class="content-section">
+                <div class="title-container">
+                  <el-icon class="star-icon"><Star /></el-icon>
+                  <div class="preview-title">{{ form.title || '此处将显示你的标题' }}</div>
+                  <div class="divider-line"></div>
+                </div>
+                <div class="content-box">
+                  <div class="preview-description">{{ form.content ? (form.content.length > 100 ? form.content.substring(0, 100) + '......' : form.content) : '在这里预览你的记忆内容，胶囊一旦封存，在开启时间到来之前将无法再次查看。' }}</div>
                 </div>
               </div>
+              
+              <!-- 底部信息栏 -->
+              <div class="info-bar">
+                <div class="info-item">
+                  <el-icon class="info-icon"><Lock /></el-icon>
+                  <span>封存状态：{{ form.privacy === 'private' ? '私密' : '公开' }}</span>
+                </div>
+                <div class="info-item">
+                  <el-icon class="info-icon"><Calendar /></el-icon>
+                  <span>{{ form.openDate ? formatDate(form.openDate) : '待定开启日期' }}</span>
+                </div>
+              </div>
+              
+              <!-- 底部蓝线 -->
+              <div class="bottom-line"></div>
             </div>
           </el-card>
         </div>
@@ -185,7 +213,7 @@
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, ElInput, ElColorPicker } from 'element-plus'
-import { Plus, Lock, Unlock, Check, InfoFilled, Link, Close } from '@element-plus/icons-vue'
+import { Plus, Lock, Unlock, Check, InfoFilled, Link, Close, View, Picture, Star, Calendar } from '@element-plus/icons-vue'
 import { capsuleAPI } from '@/api'
 
 export default {
@@ -198,6 +226,10 @@ export default {
     InfoFilled,
     Link,
     Close,
+    View,
+    Picture,
+    Star,
+    Calendar,
     ElColorPicker
   },
   setup() {
@@ -230,6 +262,46 @@ export default {
       if (editor) {
         editor.addEventListener('input', updateContent)
         editor.addEventListener('blur', updateContent)
+        // 阻止粘贴图片和清理文本格式
+        editor.addEventListener('paste', (e) => {
+          const clipboardData = e.clipboardData || window.clipboardData
+          const items = clipboardData.items
+          
+          // 检查是否有图片
+          for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+              e.preventDefault()
+              return
+            }
+          }
+          
+          // 清理文本格式，只保留纯文本
+          e.preventDefault()
+          const text = clipboardData.getData('text/plain')
+          const selection = window.getSelection()
+          if (selection && text) {
+            if (selection.rangeCount > 0) {
+              const range = selection.getRangeAt(0)
+              range.deleteContents()
+              range.insertNode(document.createTextNode(text))
+              // 移动光标到文本后面
+              range.setStartAfter(range.endContainer)
+              range.collapse(true)
+              selection.removeAllRanges()
+              selection.addRange(range)
+            }
+          }
+          // 同步内容
+          form.content = editor.textContent
+          form.contentHtml = editor.innerHTML
+        })
+        // 阻止拖放图片
+        editor.addEventListener('dragover', (e) => {
+          e.preventDefault()
+        })
+        editor.addEventListener('drop', (e) => {
+          e.preventDefault()
+        })
       }
     })
     
@@ -238,6 +310,10 @@ export default {
       if (editor) {
         editor.removeEventListener('input', updateContent)
         editor.removeEventListener('blur', updateContent)
+        // 移除事件监听器
+        editor.removeEventListener('paste', () => {})
+        editor.removeEventListener('dragover', () => {})
+        editor.removeEventListener('drop', () => {})
       }
     })
     
@@ -442,19 +518,19 @@ export default {
         ElMessage.error('请上传图片文件')
         return
       }
-      
-      // 检查文件大小 (10MB)
-      if (file.size / 1024 / 1024 > 10) {
-        ElMessage.error('文件大小不能超过10MB')
+
+      // 检查单张图片大小 (2MB)
+      if (file.size / 1024 / 1024 > 2) {
+        ElMessage.error('上传失败，单张图片大小不能超过 2MB，请重新选择')
         return
       }
-      
+
       // 检查上传数量
       if (form.coverImages.length >= 3) {
         ElMessage.error('最多只能上传3张图片')
         return
       }
-      
+
       // 只做本地预览，不调用上传接口
       const reader = new FileReader()
       reader.onload = (e) => {
@@ -736,11 +812,13 @@ h1 {
 .editor-container {
   position: relative;
   border-radius: 12px;
-  overflow: hidden;
+  overflow: hidden !important;
   min-height: 200px;
   background-color: #f5f5f5;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  width: 100%;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 /* 编辑器文本域 */
@@ -749,16 +827,41 @@ h1 {
   border: none;
   border-radius: 12px;
   resize: none;
-  padding: 20px;
+  padding: 20px 20px 50px 20px;
   font-size: 16px;
   line-height: 1.6;
   min-height: 200px;
-  width: 100%;
+  width: 100% !important;
+  max-width: 100% !important;
   color: #333;
   font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
   outline: none;
-  white-space: pre-wrap;
+  white-space: pre-wrap !important;
   word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-all !important;
+  box-sizing: border-box !important;
+  display: block;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* 隐形滚动条 */
+.editor-textarea::-webkit-scrollbar {
+  width: 6px;
+}
+
+.editor-textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.editor-textarea::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+}
+
+.editor-textarea::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .editor-textarea[contenteditable="true"]:empty::before {
@@ -851,6 +954,11 @@ h1 {
   padding: 0;
   background-color: transparent;
   z-index: 10;
+  pointer-events: auto;
+  width: calc(100% - 40px) !important;
+  max-width: calc(100% - 40px) !important;
+  box-sizing: border-box !important;
+  overflow-x: hidden !important;
 }
 
 .editor-toolbar :deep(.el-button) {
@@ -1075,42 +1183,151 @@ h1 {
 
 /* 胶囊预览卡片 */
 .preview-card {
-  border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(92, 142, 255, 0.1);
-  border: none;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e8e8e8;
   overflow: hidden;
+  background: white;
 }
 
 .preview-content {
-  background: linear-gradient(135deg, #1a1a1a 0%, #333 100%);
-  color: white;
   padding: 24px;
-  min-height: 300px;
+  min-height: auto;
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.eye-icon {
+  font-size: 18px;
+  color: #409EFF;
 }
 
 .preview-header h3 {
-  margin: 0 0 20px 0;
-  font-size: 18px;
+  margin: 0;
+  font-size: 16px;
   font-weight: 600;
+  color: #333;
+}
+
+.cover-preview {
+  width: 100%;
+  height: 160px;
+  background: #f5f5f5;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.cover-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #999;
+}
+
+.cover-icon {
+  font-size: 32px;
+  color: #ccc;
+}
+
+.cover-placeholder p {
+  margin: 0;
+  font-size: 14px;
+  color: #999;
+}
+
+.cover-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.content-section {
+  margin-bottom: 20px;
+}
+
+.title-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.star-icon {
+  font-size: 16px;
+  color: #FFD700;
+  margin-bottom: 8px;
 }
 
 .preview-title {
   font-size: 16px;
   font-weight: 600;
-  margin-bottom: 16px;
-  color: #fff;
+  color: #333;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.divider-line {
+  width: 60px;
+  height: 2px;
+  background: #409EFF;
+  border-radius: 1px;
+}
+
+.content-box {
+  background: #f9f9f9;
+  border: 2px dashed #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+  min-height: 80px;
 }
 
 .preview-description {
   font-size: 14px;
   line-height: 1.6;
-  margin-bottom: 20px;
-  color: rgba(255, 255, 255, 0.8);
+  color: #666;
+  text-align: left;
+  word-break: break-word;
 }
 
-.preview-date {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
+.info-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #666;
+}
+
+.info-icon {
+  font-size: 14px;
+  color: #409EFF;
+}
+
+.bottom-line {
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, #409EFF 0%, #66b1ff 100%);
+  border-radius: 0 0 16px 16px;
 }
 
 /* 响应式布局 */

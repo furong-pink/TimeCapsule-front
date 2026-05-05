@@ -4,29 +4,44 @@
       <el-button @click="$router.go(-1)" icon="ArrowLeft" plain>返回</el-button>
       <div class="header-content">
         <h2>{{ capsule.title }}</h2>
-        <div class="capsule-meta">
-          <el-tag :type="getCapsuleStatus().type" size="small">
-            {{ getCapsuleStatus().text }}
-          </el-tag>
-          <el-tag 
-            :type="capsule.privacy === 'PUBLIC' ? 'success' : 'info'" 
-            size="small"
-            style="margin-left: 8px;"
-          >
-            {{ capsule.privacy === 'PUBLIC' ? '公开' : '私密' }}
-          </el-tag>
-        </div>
       </div>
     </div>
 
     <div class="detail-content">
       <div class="cover-section" v-if="capsule.coverImage">
-        <img :src="capsule.coverImage" :alt="capsule.title" class="cover-image" />
+        <el-image
+          :src="capsule.coverImage"
+          :alt="capsule.title"
+          class="cover-image"
+          fit="cover"
+          @click="previewImage(capsule.coverImage)"
+        />
       </div>
+      
+      <!-- 图片预览对话框 -->
+      <el-dialog
+        v-model="previewVisible"
+        title="图片预览"
+        width="80%"
+        append-to-body
+      >
+        <el-image
+          :src="previewImageUrl"
+          fit="contain"
+          style="width: 100%; height: 70vh;"
+        />
+      </el-dialog>
 
       <div class="info-section">
         <h3>胶囊信息</h3>
         <el-descriptions :column="2" border>
+          <el-descriptions-item label="创建者">
+            <div class="creator-info" v-if="capsule.user">
+              <img v-if="capsule.user.avatar" :src="capsule.user.avatar" :alt="capsule.user.nickname" class="creator-avatar" />
+              <span>{{ capsule.user.nickname || '未知用户' }}</span>
+            </div>
+            <span v-else>未知用户</span>
+          </el-descriptions-item>
           <el-descriptions-item label="创建时间">
             {{ formatDate(capsule.createdAt || capsule.created_at || capsule.date) }}
           </el-descriptions-item>
@@ -61,12 +76,13 @@
             class="media-item"
           >
             <!-- 提取媒体文件URL，兼容不同的字段名 -->
-            <img 
-              v-if="media && isImage(getSafeMediaUrl(media))" 
-              :src="getSafeMediaUrl(media)" 
+            <el-image
+              v-if="media && isImage(getSafeMediaUrl(media))"
+              :src="getSafeMediaUrl(media)"
               :alt="getSafeMediaFileName(media) || '媒体文件'"
-              @click="previewImage(getSafeMediaUrl(media))"
               class="media-preview"
+              fit="cover"
+              @click="previewImage(getSafeMediaUrl(media))"
             />
             <video 
               v-else-if="media && isVideo(getSafeMediaUrl(media))" 
@@ -115,6 +131,8 @@ export default {
     const capsule = ref({})
     const loading = ref(false)
     const opening = ref(false)
+    const previewVisible = ref(false)
+    const previewImageUrl = ref('')
     
     // 安全获取媒体文件URL的辅助函数
     const getSafeMediaUrl = (media) => {
@@ -215,8 +233,10 @@ export default {
 
     // 预览图片
     const previewImage = (url) => {
-      // 这里可以实现图片预览功能
-      console.log('预览图片:', url)
+      if (url) {
+        previewImageUrl.value = url
+        previewVisible.value = true
+      }
     }
     
     // 重新加载胶囊详情（包含媒体文件）
@@ -412,6 +432,8 @@ export default {
       capsule,
       loading,
       opening,
+      previewVisible,
+      previewImageUrl,
       formatDate,
       isDueToOpen,
       getCapsuleStatus,
@@ -469,7 +491,9 @@ export default {
 
 .cover-image {
   max-width: 100%;
-  height: auto;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -565,5 +589,18 @@ export default {
 .action-section {
   text-align: center;
   margin-top: 24px;
+}
+
+.creator-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.creator-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
 }
 </style>
