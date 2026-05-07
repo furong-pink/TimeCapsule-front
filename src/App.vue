@@ -707,28 +707,27 @@ onUnmounted(() => {
 
 /* 顶部栏样式 */
 .app-header {
-  background-color: #5c8eff;
-  color: white;
-  box-shadow: 0 2px 8px rgba(92, 142, 255, 0.3);
+  background: linear-gradient(180deg, #4a90ff 0%, #3d7fe8 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(74, 144, 255, 0.3);
   z-index: 100;
   margin: 0;
   position: relative;
-  backdrop-filter: blur(10px);
-  background-image: linear-gradient(135deg, #5c8eff 0%, #4a7bff 100%);
 }
 
 .header-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
-  height: 60px;
+  padding: 0 28px;
+  height: 56px;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 32px;
+  flex-shrink: 0;
 }
 
 .header-nav {
@@ -736,21 +735,22 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 20px;
+  padding: 0;
 }
 
 .header-right {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 16px;
+  flex-shrink: 0;
 }
 
 .header-title {
   font-size: 24px;
-  font-weight: 700;
+  font-weight: 800;
   white-space: nowrap;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  color: #ffffff;
+  line-height: 56px;
   letter-spacing: 1px;
 }
 
@@ -759,7 +759,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   flex: 1;
-  padding: 0 20px;
+  padding: 0;
 }
 
 .header-right {
@@ -772,7 +772,7 @@ onUnmounted(() => {
   border-bottom: none !important;
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 8px;
   margin: 0;
   padding: 0;
   flex-wrap: nowrap;
@@ -789,72 +789,40 @@ onUnmounted(() => {
 }
 
 .top-nav-menu .el-menu-item {
-  color: rgba(255, 255, 255, 0.9);
-  background-color: transparent !important;
-  border-radius: 25px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  padding: 0 28px;
-  height: 40px;
-  line-height: 40px;
-  margin: 0 8px;
+  color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  border-radius: 20px;
+  transition: all 0.25s ease;
+  padding: 0 20px;
+  height: 34px;
+  line-height: 34px;
+  margin: 0;
   font-weight: 500;
-  position: relative;
-  overflow: hidden;
+  font-size: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.top-nav-menu .el-menu-item::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
-  transition: left 0.5s ease;
-}
-
-.top-nav-menu .el-menu-item:hover::before {
-  left: 100%;
+  border: none;
 }
 
 .top-nav-menu .el-menu-item:hover {
-  color: #ffffff;
-  background-color: rgba(255, 255, 255, 0.1) !important;
-  transform: translateY(0);
-  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.3);
+  background-color: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
 }
 
 .top-nav-menu .el-menu-item.is-active {
-  color: #ffffff;
-  background-color: rgba(255, 255, 255, 0.3) !important;
+  color: #4a7bff !important;
+  background-color: #ffffff !important;
   font-weight: 600;
-  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.25);
-  transform: translateY(0);
-  border-color: rgba(255, 255, 255, 0.4);
-}
-
-.top-nav-menu .el-menu-item.is-active::before {
-  background: linear-gradient(90deg, transparent, rgba(92, 142, 255, 0.15), transparent);
 }
 
 .top-nav-menu .el-menu-item .el-icon {
-  margin-right: 10px;
-  font-size: 16px;
-  transition: transform 0.3s ease;
-}
-
-.top-nav-menu .el-menu-item:hover .el-icon {
-  transform: scale(1.15);
+  margin-right: 6px;
+  font-size: 14px;
 }
 
 .top-nav-menu .el-menu-item.is-active .el-icon {
-  color: #5c8eff;
-  transform: scale(1.15);
+  color: #4a7bff;
 }
 
 
@@ -917,24 +885,27 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   cursor: pointer;
-  padding: 4px 12px;
-  border-radius: 4px;
-  transition: background-color 0.3s;
-  height: 36px;
+  padding: 4px 8px;
+  border-radius: 17px;
+  transition: all 0.25s ease;
+  height: 34px;
 }
 
 .user-info:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.15);
 }
 
 .username {
-  margin-right: 8px;
+  margin-right: 6px;
   font-size: 14px;
+  font-weight: 500;
+  color: #ffffff;
 }
 
 .dropdown-icon {
   font-size: 12px;
-  transition: transform 0.3s;
+  transition: transform 0.25s ease;
+  color: #ffffff;
 }
 
 .user-info.dropdown-open .dropdown-icon {
@@ -946,19 +917,22 @@ onUnmounted(() => {
   cursor: pointer;
   display: flex;
   align-items: center;
-  padding: 0 10px;
-  height: 36px;
-  border-radius: 4px;
-  transition: background-color 0.3s;
+  padding: 0 8px;
+  height: 34px;
+  border-radius: 17px;
+  transition: all 0.25s ease;
 }
 
 .notification-icon:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.15);
 }
 
 .notification-dropdown {
   width: 350px;
   padding: 0;
+  background-color: #ffffff !important;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 
 .notification-header {
@@ -968,6 +942,8 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   font-weight: bold;
+  color: #303133 !important;
+  font-size: 14px;
 }
 
 .notification-list {
@@ -984,6 +960,12 @@ onUnmounted(() => {
 .notification-item {
   padding: 12px 15px !important;
   border-bottom: 1px solid #f9f9f9;
+  color: #303133 !important;
+  background-color: #ffffff !important;
+}
+
+.notification-item:hover {
+  background-color: #f5f7fa !important;
 }
 
 .notification-content {
@@ -1001,7 +983,7 @@ onUnmounted(() => {
 
 .capsule-title {
   font-weight: bold;
-  color: #303133;
+  color: #303133 !important;
   font-size: 14px;
   flex: 1;
   white-space: nowrap;
@@ -1015,7 +997,7 @@ onUnmounted(() => {
 
 .notification-body {
   font-size: 13px;
-  color: #606266;
+  color: #606266 !important;
   white-space: normal;
   line-height: 1.4;
   margin-top: 2px;
@@ -1023,7 +1005,7 @@ onUnmounted(() => {
 
 .notification-time {
   font-size: 12px;
-  color: #909399;
+  color: #909399 !important;
   margin-top: 2px;
 }
 

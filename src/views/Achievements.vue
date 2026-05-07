@@ -211,43 +211,52 @@ export default {
     const newAchievements = ref([])
 
     // 根据徽章标题获取对应的用户业务数据
+    // 返回null表示优先使用后端数据，只有当后端数据不可用时才使用前端计算的值
     const getProgressFromUserStats = (title) => {
       switch (title) {
         case '记录者':
-          return userStats.value.capsuleCount;
+          // 使用后端数据（CREATE_CAPSULE_COUNT）
+          return null;
         case '目标达人':
-          return userStats.value.completedGoalCount;
+          // 使用后端数据（COMPLETE_GOAL_COUNT）
+          return null;
         case '分享者':
-          return userStats.value.sharedCapsuleCount;
+          // 使用后端数据（SHARE_CAPSULE_COUNT）
+          return null;
         case '坚持者':
-          return userStats.value.recordDayCount;
+          // 使用后端数据（CONSECUTIVE_DAYS）
+          return null;
         case '成就收集家':
-          return userStats.value.achievementCount;
+          // 使用后端数据（ACHIEVEMENT_COUNT）
+          return null;
         case '时间旅行者':
-          // 时间旅行者需要特殊处理（已开启的胶囊）
-          return 0;
+          // 使用后端数据（OPEN_PAST_CAPSULE）
+          return null;
         case '初学者':
-          // 初学者：创建第一个时间胶囊（已创建则完成）
-          return userStats.value.capsuleCount >= 1 ? 1 : 0;
+          // 使用后端数据（CREATE_CAPSULE_COUNT）
+          return null;
         case '完美主义者':
-          // 完美主义者：完成所有目标（需要知道目标总数）
-          return 0;
+          // 使用后端数据（COMPLETE_ALL_GOALS）
+          return null;
         default:
-          return 0;
+          return null; // 默认使用后端数据
       }
     }
 
     // 根据API文档中的数据结构映射成就数据
     const mapAchievementData = (achievement) => {
-      // 从用户真实业务数据中计算进度
-      const userProgress = getProgressFromUserStats(achievement.title);
+      // 获取目标值
       const conditionValue = achievement.conditionValue || 0;
       
-      // 判断是否达成：进度 >= 目标值
-      const isAchieved = userProgress >= conditionValue;
+      // 使用后端返回的进度数据（后端已正确计算）
+      const calculatedProgress = achievement.currentProgress !== undefined && achievement.currentProgress !== null 
+        ? achievement.currentProgress 
+        : 0;
       
-      // 计算显示的进度值（不超过目标值）
-      const calculatedProgress = Math.min(userProgress, conditionValue);
+      // 使用后端返回的解锁状态
+      const isAchieved = achievement.achieved !== undefined && achievement.achieved !== null 
+        ? achievement.achieved 
+        : false;
 
       return {
         id: achievement.id,
@@ -256,7 +265,7 @@ export default {
         icon: achievement.icon || 'Star', // 默认图标
         achieved: isAchieved,
         isNew: achievement.isNew,
-        achievedDate: isAchieved ? achievement.achievedAt || new Date().toISOString() : null,
+        achievedDate: isAchieved ? achievement.achievedAt || null : null,
         condition: `${achievement.conditionType}: ${conditionValue}`,
         progress: calculatedProgress,
         total: conditionValue,
@@ -393,6 +402,26 @@ export default {
         if (window.$axios) {
           const response = await window.$axios.get(`/achievements?filter=${filter}`)
           if (response?.code === 200 && response.data) {
+            // 调试：打印后端返回的原始数据
+            console.log('=== 后端返回的成就原始数据 ===');
+            console.log('完整响应:', response.data);
+            console.log('成就列表:', response.data.list);
+            
+            // 查找时间旅行者成就
+            const timeTravelerAchievement = response.data.list?.find(a => a.title === '时间旅行者');
+            if (timeTravelerAchievement) {
+              console.log('=== 时间旅行者成就数据 ===');
+              console.log('ID:', timeTravelerAchievement.id);
+              console.log('标题:', timeTravelerAchievement.title);
+              console.log('conditionType:', timeTravelerAchievement.conditionType);
+              console.log('conditionValue:', timeTravelerAchievement.conditionValue);
+              console.log('achieved:', timeTravelerAchievement.achieved);
+              console.log('currentProgress:', timeTravelerAchievement.currentProgress);
+              console.log('achievedAt:', timeTravelerAchievement.achievedAt);
+            } else {
+              console.log('未找到时间旅行者成就');
+            }
+            
             // 更新统计信息（先更新，以便getUserStats可以使用）
             if (response.data.statistics) {
               statistics.value = response.data.statistics
@@ -403,6 +432,20 @@ export default {
 
             // 映射成就列表数据（此时userStats已更新，可以计算真实进度）
             const newAchievementsData = response.data.list.map(mapAchievementData);
+
+            // 调试：打印映射后的数据
+            console.log('=== 映射后的成就数据 ===');
+            console.log(newAchievementsData);
+            
+            // 查找映射后的时间旅行者成就
+            const mappedTimeTraveler = newAchievementsData.find(a => a.title === '时间旅行者');
+            if (mappedTimeTraveler) {
+              console.log('=== 映射后的时间旅行者成就 ===');
+              console.log('progress:', mappedTimeTraveler.progress);
+              console.log('total:', mappedTimeTraveler.total);
+              console.log('achieved:', mappedTimeTraveler.achieved);
+              console.log('achievedDate:', mappedTimeTraveler.achievedDate);
+            }
 
             // 强制更新数组以确保Vue响应式更新
             achievements.value = [];
