@@ -8,6 +8,7 @@ import CapsuleCreate from '@/views/CapsuleCreate.vue'
 import Timeline from '@/views/Timeline.vue'
 import Goals from '@/views/Goals.vue'
 import Achievements from '@/views/Achievements.vue'
+import Friends from '@/views/Friends.vue'
 import CapsuleDetail from '@/views/CapsuleDetail.vue'
 
 import EditProfile from '@/views/profile/EditProfile.vue'
@@ -49,6 +50,7 @@ const routes = [
     meta: { title: '我的目标' }
   },
   { path: '/achievements', name: 'Achievements', component: Achievements, meta: { title: '成就徽章' } },
+  { path: '/friends', name: 'Friends', component: Friends, meta: { title: '我的好友' } },
   {
     path: '/admin/users',
     name: 'UserManagement',
@@ -91,7 +93,13 @@ const routes = [
 // 创建路由器实例
 const router = createRouter({
   history: createWebHistory(),
-  routes
+  routes,
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) {
+      return savedPosition
+    }
+    return { top: 0 }
+  }
 })
 
 // 路由守卫：检查登录状态和权限

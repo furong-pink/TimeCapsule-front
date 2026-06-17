@@ -124,16 +124,16 @@
                         {{ '暂无消息' }}
                       </div>
                       <div class="notification-list">
-                        <el-dropdown-item v-for="item in notifications" :key="item.id" :command="item" class="notification-item">
+                        <el-dropdown-item v-for="item in notifications" :key="item.id" :command="item" class="notification-item" :class="{ unread: !item.isRead }">
                           <div class="notification-content">
                             <div class="notification-header-row">
-                              <el-tag size="small" :type="item.type === 'APPROVAL' ? 'success' : 'danger'" class="notification-tag">
-                                {{ item.type === 'APPROVAL' ? '审核通过' : '审核拒绝' }}
+                              <el-tag size="small" :type="notifTagType(item.type)" class="notification-tag">
+                                {{ notifTypeLabel(item.type) }}
                               </el-tag>
-                              <span class="capsule-title" :title="'您的胶囊《' + item.content + '》'">您的胶囊《{{ item.content.length > 12 ? item.content.substring(0, 12) + '...' : item.content }}》</span>
+                              <span class="capsule-title">{{ item.content }}</span>
                             </div>
-                            <div class="notification-body">
-                              {{ item.type === 'APPROVAL' ? '恭喜您，您的胶囊审核通过' : '拒绝理由：' + item.reason }}
+                            <div class="notification-body" v-if="item.reason">
+                              {{ item.reason }}
                             </div>
                             <div class="notification-time">{{ formatDate(item.createdAt) }}</div>
                           </div>
@@ -153,6 +153,10 @@
                   </span>
                   <template #dropdown>
                     <el-dropdown-menu>
+                      <el-dropdown-item command="friends">
+                        <el-icon><User /></el-icon>
+                        我的好友
+                      </el-dropdown-item>
                       <el-dropdown-item command="editProfile">
                         <el-icon><Edit /></el-icon>
                         编辑资料
@@ -203,13 +207,17 @@
                   <el-icon><Medal /></el-icon>
                   <span>{{ '成就徽章' }}</span>
                 </el-menu-item>
+                <el-menu-item index="/friends">
+                  <el-icon><User /></el-icon>
+                  <span>{{ '我的好友' }}</span>
+                </el-menu-item>
               </el-menu>
             </div>
           </el-header>
 
           <!-- 主内容区域 -->
           <el-main class="app-main">
-            <router-view :key="route.fullPath" />
+            <router-view />
           </el-main>
         </el-container>
       </template>
@@ -303,13 +311,13 @@ const initWebSocket = () => {
     wsService.connect(userInfo.value.id)
     wsService.onMessage((data) => {
       console.log('收到 WebSocket 消息:', data)
-      if (data.type === 'REJECTION' || data.type === 'APPROVAL') {
-        // 只调用fetchNotifications，因为它会同时更新计数和列表
+      if (data.type === 'REJECTION') {
         fetchNotifications()
-        if (data.type === 'REJECTION') {
-          currentRejection.value = data
-          rejectionDialogVisible.value = true
-        }
+        currentRejection.value = data
+        rejectionDialogVisible.value = true
+      } else if (data.type === 'APPROVAL' || data.type === 'LIKE' || data.type === 'COMMENT' || data.type === 'FOLLOW') {
+        fetchNotifications()
+        fetchUnreadCount()
       }
     })
   }
@@ -379,6 +387,16 @@ const markAllRead = async () => {
   }
 }
 
+const notifTagType = (type) => {
+  const map = { LIKE: '', COMMENT: '', FOLLOW: 'success', APPROVAL: 'success', REJECTION: 'danger' }
+  return map[type] || ''
+}
+
+const notifTypeLabel = (type) => {
+  const map = { LIKE: '赞', COMMENT: '评论', FOLLOW: '关注', APPROVAL: '审核通过', REJECTION: '审核拒绝' }
+  return map[type] || '消息'
+}
+
 // 处理消息点击
 const handleNotificationCommand = async (item) => {
   if (!window.$axios) return
@@ -386,7 +404,11 @@ const handleNotificationCommand = async (item) => {
     await window.$axios.put(`/notifications/${item.id}/read`)
     fetchUnreadCount()
     fetchNotifications()
-    router.push(`/capsule/${item.capsuleId}`)
+    if (item.type === 'FOLLOW') {
+      router.push('/friends')
+    } else if (item.capsuleId) {
+      router.push(`/capsule/${item.capsuleId}`)
+    }
   } catch (e) {
     console.error('操作失败:', e)
   }
@@ -487,7 +509,9 @@ const handleAdminLogout = () => {
 }
 
 const handleCommand = (command) => {
-  if (command === 'editProfile') {
+  if (command === 'friends') {
+    router.push('/friends')
+  } else if (command === 'editProfile') {
     // 导航到编辑资料页面
     router.push('/profile/edit')
   } else if (command === 'changePassword') {

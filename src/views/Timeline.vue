@@ -55,12 +55,13 @@
           <div class="timeline-card" @click="viewCapsule(activity)">
             <!-- 图片/占位区域 -->
             <div class="card-image-container">
-              <!-- 已解锁且有图片 -->
+              <!-- 已解锁且有图片 - 仅作为静态装饰，禁止任何交互 -->
               <div v-if="activity.isOpened && activity.coverImage" class="card-image-wrapper">
                 <img 
                   :src="activity.coverImage" 
-                  :alt="activity.title" 
-                  class="card-image"
+                  :alt="activity.title"
+                  class="static-cover-image"
+                  loading="lazy"
                   @error="handleImageError"
                 />
               </div>
@@ -125,6 +126,9 @@
     <div class="load-more" v-if="filteredActivities.length > 0">
       <el-button @click="loadMore" :loading="loadingMore">加载更多记忆</el-button>
     </div>
+
+    <!-- 胶囊详情模态框 -->
+    <CapsuleDetailModal v-model="showModal" :capsule-id="modalCapsuleId" />
   </div>
 </template>
 
@@ -132,6 +136,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus, Calendar, Clock, Unlock, Lock, Timer, Filter } from '@element-plus/icons-vue'
+import CapsuleDetailModal from './CapsuleDetailModal.vue'
 
 export default {
   name: 'Timeline',
@@ -141,7 +146,8 @@ export default {
     Clock,
     Unlock,
     Lock,
-    Timer
+    Timer,
+    CapsuleDetailModal
   },
   setup() {
     const router = useRouter()
@@ -151,6 +157,10 @@ export default {
     const selectedYearRange = ref('7d')
     const activities = ref([])
     const openingCapsules = ref({}) // 用于跟踪正在开启的胶囊
+
+    // ---- 胶囊详情模态框 ----
+    const showModal = ref(false)
+    const modalCapsuleId = ref(null)
 
     // 获取所有年份
     const years = computed(() => {
@@ -277,6 +287,8 @@ export default {
       event.target.src = 'data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22240%22 viewBox=%220 0 400 240%22%3E%3Crect width=%22400%22 height=%22240%22 fill=%22%23f0f0f0%22/%3E%3Ctext x=%22200%22 y=%22130%22 font-size=%2216%22 text-anchor=%22middle%22 fill=%22%23999%22%3E图片加载失败%3C/text%3E%3C/svg%3E';
     }
 
+    
+
     // 获取胶囊标签
     const getTags = (activity) => {
       const tags = []
@@ -296,28 +308,23 @@ export default {
       return 'info'
     }
 
-    // 查看胶囊详情
+    // 查看胶囊详情 → 打开模态框
     const viewCapsule = (activity) => {
-      // 跳转到胶囊详情页
-      if (activity.id) {
-        // 优先检查胶囊是否已开启，如果已开启，直接跳转
-        if (activity.isOpened) {
-          router.push(`/capsule/${activity.id}`);
-        } else {
-          // 未开启，检查是否已到达开启日期
-          if (isDueToOpen(activity.openDate || activity.open_date)) {
-            router.push(`/capsule/${activity.id}`);
-          } else {
-            // 未到达开启日期，提示开启时间
-            const openDate = activity.openDate || activity.open_date;
-            const openDateStr = openDate ? formatDate(openDate) : '未来';
-            const message = `此时间胶囊将于 ${openDateStr} 开启`;
-            window.$message ? window.$message.info(message) : alert(message);
-          }
-        }
-      } else {
-        console.error('时间胶囊ID不存在:', activity);
+      if (!activity.id) {
+        console.error('时间胶囊ID不存在:', activity)
+        return
       }
+
+      if (!activity.isOpened && !isDueToOpen(activity.openDate || activity.open_date)) {
+        const openDate = activity.openDate || activity.open_date
+        const openDateStr = openDate ? formatDate(openDate) : '未来'
+        const message = `此时间胶囊将于 ${openDateStr} 开启`
+        window.$message ? window.$message.info(message) : alert(message)
+        return
+      }
+
+      modalCapsuleId.value = activity.id
+      showModal.value = true
     }
 
     // 开启时间胶囊
@@ -473,7 +480,10 @@ export default {
       viewCapsule,
       openCapsule,
       openingCapsules,
-      loadMore
+      loadMore,
+      // 模态框
+      showModal,
+      modalCapsuleId,
     }
   }
 }
@@ -667,21 +677,18 @@ export default {
   position: relative;
   overflow: hidden;
   border-radius: 8px 8px 0 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-/* 卡片图片 */
-.card-image {
+/* 静态封面图片 - 仅作为视觉装饰，禁止任何交互 */
+.static-cover-image {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.3s ease, filter 0.3s ease;
-  border-radius: 8px 8px 0 0;
-}
-
-.timeline-card:hover .card-image {
-  transform: scale(1.05);
-  filter: brightness(1.05) saturate(1.1);
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  border-radius: 10px;
 }
 
 /* 卡片占位图 */
@@ -818,7 +825,7 @@ export default {
   font-size: 16px;
 }
 
-/* 响应式 */
+/* ========== 响应式 ========== */
 @media (max-width: 768px) {
   .timeline {
     padding: 0 16px;

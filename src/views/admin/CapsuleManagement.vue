@@ -127,8 +127,39 @@
         </div>
         <el-divider />
         <div class="content-preview" v-html="currentCapsule.content"></div>
-        <div v-if="currentCapsule.coverImage" class="image-preview">
-          <el-image :src="currentCapsule.coverImage" :preview-src-list="[currentCapsule.coverImage]" />
+        
+        <!-- 图片展示区域 -->
+        <div v-if="getAllImageUrls().length > 0" class="images-section">
+          <h4>图片</h4>
+          <div class="images-grid">
+            <!-- 封面图片 -->
+            <div v-if="currentCapsule.coverImage" class="image-item cover-image-item">
+              <el-image 
+                :src="currentCapsule.coverImage" 
+                :preview-src-list="getAllImageUrls()"
+                :fit="'cover'"
+                class="preview-image"
+              />
+              <span class="cover-badge">封面</span>
+            </div>
+            <!-- 媒体文件中的图片 -->
+            <template v-if="currentCapsule.mediaFiles && currentCapsule.mediaFiles.length > 0">
+              <div 
+                v-for="(media, index) in currentCapsule.mediaFiles" 
+                :key="index"
+                class="image-item"
+                v-show="isImage(getSafeMediaUrl(media))"
+              >
+                <el-image 
+                  :src="getSafeMediaUrl(media)" 
+                  :preview-src-list="getAllImageUrls()"
+                  :initial-index="getImageIndex(getSafeMediaUrl(media))"
+                  :fit="'cover'"
+                  class="preview-image"
+                />
+              </div>
+            </template>
+          </div>
         </div>
       </div>
     </el-dialog>
@@ -405,6 +436,48 @@ const getStatusLabel = (status) => {
 const formatDate = (date) => {
   return date ? dayjs(date).format('YYYY-MM-DD HH:mm') : '-'
 }
+
+// 安全获取媒体文件URL
+const getSafeMediaUrl = (media) => {
+  if (!media || typeof media !== 'object') {
+    return null;
+  }
+  return media.fileUrl || media.url || media.filePath || media.source || null;
+}
+
+// 检查是否为图片
+const isImage = (url) => {
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+  return /\.(jpg|jpeg|png|gif|webp)$/i.test(url.toLowerCase());
+}
+
+// 获取所有图片URL（用于预览）
+const getAllImageUrls = () => {
+  const urls = []
+  // 封面图片
+  if (currentCapsule.value?.coverImage) {
+    urls.push(currentCapsule.value.coverImage)
+  }
+  // 媒体文件中的图片
+  if (currentCapsule.value?.mediaFiles && Array.isArray(currentCapsule.value.mediaFiles)) {
+    currentCapsule.value.mediaFiles.forEach(media => {
+      const url = getSafeMediaUrl(media)
+      if (url && isImage(url)) {
+        urls.push(url)
+      }
+    })
+  }
+  return urls
+}
+
+// 获取图片在预览列表中的索引
+const getImageIndex = (url) => {
+  const urls = getAllImageUrls()
+  const index = urls.indexOf(url)
+  return index >= 0 ? index : 0
+}
 </script>
 
 <style scoped>
@@ -445,10 +518,84 @@ const formatDate = (date) => {
 }
 .image-preview {
   margin-top: 20px;
-  text-align: center;
+  width: 100%;
+  padding-top: 56.25%;
+  position: relative;
+  overflow: hidden;
+  border-radius: 4px;
 }
 .image-preview .el-image {
-  max-width: 100%;
-  max-height: 300px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 多图展示区域 */
+.images-section {
+  margin-top: 20px;
+}
+.images-section h4 {
+  margin-bottom: 12px;
+  font-size: 16px;
+  color: #333;
+}
+.images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+.images-grid::-webkit-scrollbar {
+  width: 6px;
+}
+.images-grid::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+.images-grid::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+.images-grid::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
+.image-item {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+}
+.image-item .preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cover-image-item {
+  border: 2px solid #409eff;
+}
+.cover-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #409eff;
+  color: #fff;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+@media screen and (max-width: 768px) {
+  .image-preview {
+    padding-top: 56.25%;
+  }
+  .images-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  }
 }
 </style>

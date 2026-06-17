@@ -198,4 +198,39 @@ export const uploadAPI = {
   }
 };
 
+// 好友/关注API
+export const friendAPI = {
+  // 好友列表 (互相关注)
+  getFriends: (params) => api.get('/friends', { params }),
+
+  // 搜索用户
+  searchUsers: (keyword) => api.get('/friends/search', { params: { keyword } }),
+
+  // 关注/取消关注
+  followUser: (userId) => api.post(`/friends/follow/${userId}`),
+  unfollowUser: (userId) => api.delete(`/friends/follow/${userId}`),
+
+  // 关注列表
+  getFollowing: (userId, params) => api.get(`/friends/following/${userId}`, { params }),
+
+  // 粉丝列表
+  getFollowers: (userId, params) => api.get(`/friends/followers/${userId}`, { params }),
+
+  // 用户统计
+  getUserStats: (userId) => api.get(`/friends/stats/${userId}`),
+
+  // 好友详情
+  getFriendProfile: (userId) => api.get(`/friends/${userId}`),
+
+  // 聊天记录
+  getChatMessages: (userId, params) => api.get(`/friends/${userId}/messages`, { params }),
+
+  // 发送消息
+  sendMessage: (userId, data) => api.post(`/friends/${userId}/messages`, data),
+
+  // 推荐/发现
+  getFriendRecommendations: () => api.get('/friends/recommendations'),
+  getDiscoverFriends: (params) => api.get('/friends/discover', { params })
+};
+
 export default api;
